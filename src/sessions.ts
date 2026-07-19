@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import { SESSIONS_FILE, saveConfig } from "./config.js";
+import { DEFAULT_MODE, SESSION_NAME_PREFIX, PREVIEW } from "./constants.js";
 import type { LlmMessage } from "./llm.js";
 import { agentTurn, MODE_PROMPTS, buildToolsForAgent } from "./agent.js";
 import type { LogFn } from "./tools.js";
@@ -14,7 +15,7 @@ export class ChatSession {
   unsaved: boolean;
   messages: LlmMessage[];
 
-  constructor(mode: string = "build", unsaved: boolean = false) {
+  constructor(mode: string = DEFAULT_MODE, unsaved: boolean = false) {
     this.mode = mode;
     this.unsaved = unsaved;
     this.messages = [{ role: "system", content: MODE_PROMPTS[this.mode] }];
@@ -69,17 +70,17 @@ export class SessionManager {
     this.order = [];
     this.current = "";
     this._counter = 0;
-    this.newSession(undefined, "build", true); // start with an empty unsaved session
+    this.newSession(undefined, DEFAULT_MODE, true); // start with an empty unsaved session
   }
 
   private _nextName(): string {
     this._counter++;
-    return `session-${this._counter}`;
+    return `${SESSION_NAME_PREFIX}${this._counter}`;
   }
 
   newSession(
     name?: string,
-    mode: string = "build",
+    mode: string = DEFAULT_MODE,
     unsaved: boolean = false
   ): string {
     const sessionName = (name || "").trim() || this._nextName();
@@ -116,7 +117,7 @@ export class SessionManager {
           .reverse()
           .find((m) => m.role === "user")
           ?.content?.toString()
-          .slice(0, 40) || "";
+          .slice(0, PREVIEW.session) || "";
       const suffix = preview ? ` — "${preview}"` : "";
       const msgLabel = nMsgs !== 1 ? "msgs" : "msg";
       lines.push(
@@ -164,7 +165,7 @@ export class SessionManager {
         : manager.order[0];
 
     // Add an empty unsaved session on top (like Python version)
-    manager.newSession(undefined, "build", true);
+    manager.newSession(undefined, DEFAULT_MODE, true);
 
     return manager;
   }

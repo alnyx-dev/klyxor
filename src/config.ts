@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { MAX_SUBAGENT_DEPTH } from "./constants.js";
+
+export { MAX_SUBAGENT_DEPTH };
 
 export const APP_NAME = "Klyxor";
-
-export const DEFAULT_MAX_TURNS = 200;
-export const MAX_SUBAGENT_DEPTH = 2;
 
 export const KLYXOR_DIR = path.join(process.cwd(), ".klyxor");
 export const SKILLS_DIR = path.join(KLYXOR_DIR, "skills");
@@ -55,7 +55,12 @@ export function ensureKlyxorDir(): boolean {
 export interface Provider {
   base_url: string;
   api_key: string;
+  /** @deprecated Use active_model instead. Kept for backward compat. */
   model: string;
+  /** All available models for this provider */
+  models: string[];
+  /** Currently selected model */
+  active_model: string;
 }
 
 export interface ConfigData {
@@ -64,7 +69,13 @@ export interface ConfigData {
 }
 
 let _providers: Record<string, Provider> = {
-  default: { base_url: "http://ip:port/v1", api_key: "...", model: "..." },
+  default: {
+    base_url: "http://ip:port/v1",
+    api_key: "...",
+    model: "...",
+    models: ["..."],
+    active_model: "...",
+  },
 };
 let _activeProvider = "default";
 
@@ -88,7 +99,9 @@ export function listProvidersText(): string {
   const lines: string[] = [];
   for (const [name, p] of Object.entries(_providers)) {
     const marker = name === _activeProvider ? "*" : " ";
-    lines.push(`${marker} ${name}: model=${p.model} base_url=${p.base_url}`);
+    const model = getActiveModel(p);
+    const modelList = p.models?.length > 0 ? p.models.join(", ") : model;
+    lines.push(`${marker} ${name}: model=${model} models=[${modelList}] base_url=${p.base_url}`);
   }
   return lines.join("\n");
 }
@@ -101,14 +114,82 @@ export function addProvider(
 ): string {
   if (!name) return "cancelled";
   if (!base_url || !model) return "cancelled: base_url and model are required";
-  _providers[name] = { base_url, api_key, model };
+  const models = [model];
+  _providers[name] = { base_url, api_key, model, models, active_model: model };
   _activeProvider = name;
   return `→ added and switched to provider '${name}'`;
+}
+
+export function getActiveModel(provider?: Provider): string {
+  const p = provider || _providers[_activeProvider];
+  if (!p) return "";
+  return p.active_model || p.model || p.models?.[0] || "";
+}
+
+export function setActiveModel(providerName: string, model: string): string {
+  const p = _providers[providerName];
+  if (!p) return `Unknown provider '${providerName}'`;
+  // Auto-add model to list if not present
+  if (!p.models) p.models = [];
+  if (!p.models.includes(model)) {
+    p.models.push(model);
+  }
+  p.active_model = model;
+  p.model = model; // keep deprecated field in sync
+  return `→ switched ${providerName} to model '${model}'`;
+}
+
+export function addModelToProvider(providerName: string, model: string): string {
+  const p = _providers[providerName];
+  if (!p) return `Unknown provider '${providerName}'`;
+  if (!model) return "Model name is required";
+  if (!p.models) p.models = [];
+  if (p.models.includes(model)) return `Model '${model}' already exists`;
+  p.models.push(model);
+  // If this is the first model, make it active
+  if (p.models.length === 1) {
+    p.active_model = model;
+    p.model = model;
+  }
+  return `→ added model '${model}' to ${providerName}`;
+}
+
+export function removeModelFromProvider(providerName: string, model: string): string {
+  const p = _providers[providerName];
+  if (!p) return `Unknown provider '${providerName}'`;
+  if (!p.models || !p.models.includes(model)) {
+    return `Model '${model}' not found in ${providerName}`;
+  }
+  if (p.models.length <= 1) {
+    return `Cannot remove the only model from ${providerName}`;
+  }
+  p.models = p.models.filter((m) => m !== model);
+  // If removed model was active, switch to first remaining
+  if (p.active_model === model || p.model === model) {
+    const newModel = p.models[0];
+    p.active_model = newModel;
+    p.model = newModel;
+    return `→ removed '${model}', switched to '${newModel}'`;
+  }
+  return `→ removed model '${model}' from ${providerName}`;
 }
 
 export function connectCommand(arg: string): string {
   arg = arg.trim();
   if (arg) {
+    // Support "provider/model" syntax
+    const slashIdx = arg.indexOf("/");
+    if (slashIdx !== -1) {
+      const providerName = arg.slice(0, slashIdx);
+      const modelName = arg.slice(slashIdx + 1);
+      if (!(providerName in _providers)) {
+        return `Unknown provider '${providerName}'. Known: ${Object.keys(_providers).join(", ")}.`;
+      }
+      _activeProvider = providerName;
+      const result = setActiveModel(providerName, modelName);
+      saveConfig();
+      return `→ switched to provider '${providerName}'\n  ${result}`;
+    }
     if (!(arg in _providers)) {
       return `Unknown provider '${arg}'. Known: ${Object.keys(_providers).join(", ")}. Run /connect with no name to add a new one.`;
     }
@@ -152,10 +233,22 @@ export function loadConfig(): boolean {
   if (!fs.existsSync(CONFIG_FILE)) return false;
   try {
     const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
-    const data: ConfigData = JSON.parse(raw);
+    const data = JSON.parse(raw) as {
+      providers?: Record<string, Partial<Provider> & { model?: string }>;
+      active_provider?: string;
+    };
     const providers = data.providers;
     if (providers && Object.keys(providers).length > 0) {
-      _providers = providers;
+      // Migrate old configs: add models/active_model if missing
+      for (const [, p] of Object.entries(providers)) {
+        if (!p.models) {
+          p.models = p.model ? [p.model] : [];
+        }
+        if (!p.active_model) {
+          p.active_model = p.model || p.models[0] || "";
+        }
+      }
+      _providers = providers as Record<string, Provider>;
     }
     _activeProvider = data.active_provider || _activeProvider;
     if (!(_activeProvider in _providers)) {

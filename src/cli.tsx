@@ -17,6 +17,7 @@ import {
 import { loadState, SessionManager, saveState } from "./sessions.js";
 import { runAgent } from "./agent.js";
 import { App } from "./tui/App.js";
+import { BANNER_WIDTH, DEFAULT_MODE } from "./constants.js";
 
 const args = process.argv.slice(2);
 
@@ -41,7 +42,7 @@ if (args.length > 0) {
   ensureKlyxorDir();
   loadConfig();
 
-  let mode = "build";
+  let mode = DEFAULT_MODE;
   let taskArgs = args;
 
   if (args[0] === "--plan" || args[0] === "--build") {
@@ -60,7 +61,7 @@ if (args.length > 0) {
 
   const finalAnswer = await runAgent(prompt, mode);
   console.log(
-    `\n${"#".repeat(60)}\nFINAL ANSWER\n${"#".repeat(60)}\n${finalAnswer}`
+    `\n${"#".repeat(BANNER_WIDTH)}\nFINAL ANSWER\n${"#".repeat(BANNER_WIDTH)}\n${finalAnswer}`
   );
   process.exit(0);
 }

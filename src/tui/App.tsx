@@ -11,7 +11,17 @@ import {
 import { handleCommand, HELP_TEXT } from "../commands.js";
 import { discoverSkills } from "../skills.js";
 import { MarkdownText } from "./MarkdownText.js";
+import { Spinner } from "./Spinner.js";
 import { CommandPalette } from "./CommandPalette.js";
+import {
+  BRAND_COLOR,
+  SEPARATOR_WIDTH,
+  PREVIEW,
+  WELCOME_MESSAGE,
+  LOADING_TEXT,
+  INPUT_PLACEHOLDER,
+  DEFAULT_MODE,
+} from "../constants.js";
 
 interface ChatEntry {
   role: "user" | "agent" | "error" | "system" | "tool";
@@ -26,6 +36,7 @@ export function App({ manager }: AppProps) {
   const { exit } = useApp();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loadingText, setLoadingText] = useState(LOADING_TEXT);
   const [, forceRender] = useState(0);
   const [showPalette, setShowPalette] = useState(false);
 
@@ -50,8 +61,7 @@ export function App({ manager }: AppProps) {
     if (entries.length === 0) {
       entries.push({
         role: "system",
-        content:
-          "Welcome to klyxor! Your AI coding assistant.\n\nTry: \"explain this project\" or \"help me debug something\"\nCommands: /help /plan /build /sessions",
+        content: WELCOME_MESSAGE,
       });
     }
     return entries;
@@ -81,7 +91,7 @@ export function App({ manager }: AppProps) {
       setShowPalette(true);
     }
     if (key.tab && !busy) {
-      const next = manager.active.mode === "plan" ? "build" : "plan";
+      const next = manager.active.mode === "plan" ? "build" : "plan"; // toggle
       manager.active.setMode(next);
       syncStatus();
     }
@@ -102,7 +112,7 @@ export function App({ manager }: AppProps) {
         }
         setChatLog(entries.length > 0 ? entries : [{
           role: "system",
-          content: "Welcome to klyxor! Your AI coding assistant.\n\nTry: \"explain this project\" or \"help me debug something\"\nCommands: /help /plan /build /sessions",
+          content: WELCOME_MESSAGE,
         }]);
         syncStatus();
       } catch (e) {
@@ -140,7 +150,7 @@ export function App({ manager }: AppProps) {
       if (actionId.startsWith("new-session:")) {
         const name = actionId.slice("new-session:".length);
         try {
-          manager.newSession(name || undefined, "build", true);
+          manager.newSession(name || undefined, DEFAULT_MODE, true);
           setChatLog(loadSessionEntries(manager));
           setShowPalette(false);
           syncStatus();
@@ -217,6 +227,11 @@ export function App({ manager }: AppProps) {
       try {
         const answer = await manager.active.send(trimmed, (msg) => {
           setChatLog((prev) => [...prev, { role: "tool", content: msg }]);
+          // Extract tool name from log messages like "🔧 bash(...)"
+          const toolMatch = msg.match(/🔧\s+(\w+)/);
+          if (toolMatch) {
+            setLoadingText(`Running ${toolMatch[1]}...`);
+          }
         });
         setChatLog((prev) => [...prev, { role: "agent", content: answer }]);
         manager.active.unsaved = false;
@@ -228,6 +243,7 @@ export function App({ manager }: AppProps) {
         ]);
       } finally {
         setBusy(false);
+        setLoadingText(LOADING_TEXT);
         syncStatus();
       }
     },
@@ -253,18 +269,20 @@ export function App({ manager }: AppProps) {
           switch (entry.role) {
             case "user":
               return (
-                <Box key={i} marginTop={i === 0 ? 0 : 1} flexDirection="row">
+                <Box key={i} marginTop={i === 0 ? 0 : 1} flexDirection="column">
                   <Text bold color="cyan">
                     {">"}{" "}
                   </Text>
-                  <Text>{entry.content}</Text>
+                  <Box paddingLeft={1}>
+                    <MarkdownText content={entry.content} />
+                  </Box>
                 </Box>
               );
             case "agent":
               return (
                 <Box key={i} marginTop={1} flexDirection="column">
                   <Text>
-                    <Text bold color="#DA7756">
+                    <Text bold color={BRAND_COLOR}>
                       {"•"}{" "}
                     </Text>
                   </Text>
@@ -275,18 +293,24 @@ export function App({ manager }: AppProps) {
               );
             case "error":
               return (
-                <Box key={i} marginTop={1}>
+                <Box key={i} marginTop={1} flexDirection="column">
                   <Text color="red">
-                    {"✗"} {entry.content}
+                    {"✗"}
                   </Text>
+                  <Box paddingLeft={1}>
+                    <MarkdownText content={entry.content} />
+                  </Box>
                 </Box>
               );
             case "system":
               return (
                 <Box key={i} marginTop={1} flexDirection="column">
                   <Text dimColor>
-                    {"*"} {entry.content}
+                    {"*"}
                   </Text>
+                  <Box paddingLeft={1}>
+                    <MarkdownText content={entry.content} />
+                  </Box>
                 </Box>
               );
             case "tool":
@@ -294,8 +318,8 @@ export function App({ manager }: AppProps) {
                 <Box key={i} marginTop={0} flexDirection="column">
                   <Text dimColor>
                     {"  "}
-                    {entry.content.length > 200
-                      ? entry.content.slice(0, 200) + "..."
+                    {entry.content.length > PREVIEW.toolOutput
+                      ? entry.content.slice(0, PREVIEW.toolOutput) + "..."
                       : entry.content}
                   </Text>
                 </Box>
@@ -308,11 +332,11 @@ export function App({ manager }: AppProps) {
 
       {/* ── status bar ────────────────────────────── */}
       <Box paddingX={1}>
-        <Text dimColor>{"─".repeat(50)}</Text>
+        <Text dimColor>{"─".repeat(SEPARATOR_WIDTH)}</Text>
       </Box>
       <Box paddingX={1}>
         <Text dimColor>
-          <Text color="#DA7756">▸</Text>{" "}
+          <Text color={BRAND_COLOR}>▸</Text>{" "}
           {currentMode}{"  │  "}{modelName}{"  │  "}{currentProvider}
         </Text>
       </Box>
@@ -320,11 +344,7 @@ export function App({ manager }: AppProps) {
       {/* ── input / thinking indicator ────────────── */}
       <Box paddingX={1} paddingTop={0}>
         {busy ? (
-          <Box>
-            <Text bold color="#DA7756">
-              {"◐"} Analyzing your code...
-            </Text>
-          </Box>
+          <Spinner text={loadingText} />
         ) : (
           <Box flexDirection="row">
             <Text color="cyan" bold>{"> "}</Text>
@@ -332,7 +352,7 @@ export function App({ manager }: AppProps) {
               value={input}
               onChange={setInput}
               onSubmit={handleSubmit}
-              placeholder="Ask me anything about your code..."
+              placeholder={INPUT_PLACEHOLDER}
             />
           </Box>
         )}

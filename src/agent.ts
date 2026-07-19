@@ -1,6 +1,7 @@
 import { callLlm, type LlmMessage } from "./llm.js";
 import { buildTools, type Tool, type LogFn } from "./tools.js";
 import { makeListSkillsTool, makeReadSkillTool } from "./skills.js";
+import { DEFAULT_MAX_TURNS, SEPARATOR_WIDTH, PREVIEW, DEFAULT_MODE } from "./constants.js";
 
 export type { LogFn } from "./tools.js";
 
@@ -35,8 +36,6 @@ export const MODE_PROMPTS: Record<string, string> = {
   build: BUILD_SYSTEM_PROMPT,
 };
 
-export const DEFAULT_MAX_TURNS = 200;
-
 export function buildToolsForAgent(
   mode: string,
   depth: number,
@@ -64,7 +63,7 @@ export async function agentTurn(
 
   for (let turn = 1; turn <= limit; turn++) {
     if (verbose) {
-      log(`\n${"=".repeat(50)}\n🔄 turn ${turn}\n${"=".repeat(50)}`);
+      log(`\n${"=".repeat(SEPARATOR_WIDTH)}\n🔄 turn ${turn}\n${"=".repeat(SEPARATOR_WIDTH)}`);
     }
 
     const toolSchemas = Array.from(tools.values()).map((t) => t.schema());
@@ -118,7 +117,7 @@ export async function agentTurn(
         resultStr = `Error: unknown tool '${fname}'`;
       } else {
         if (verbose) {
-          const argsPreview = JSON.stringify(args).slice(0, 200);
+          const argsPreview = JSON.stringify(args).slice(0, PREVIEW.args);
           log(`🔧 ${fname}(${argsPreview})`);
         }
         try {
@@ -130,8 +129,8 @@ export async function agentTurn(
 
       if (verbose) {
         const preview =
-          resultStr.length > 400
-            ? resultStr.slice(0, 400) + "..."
+          resultStr.length > PREVIEW.result
+            ? resultStr.slice(0, PREVIEW.result) + "..."
             : resultStr;
         log(`   → ${preview}`);
       }
@@ -153,7 +152,7 @@ export async function agentTurn(
  */
 export async function runAgent(
   task: string,
-  mode: string = "build",
+  mode: string = DEFAULT_MODE,
   depth: number = 0,
   log: LogFn = console.log,
   maxTurns?: number

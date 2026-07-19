@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { marked, type Token, type Tokens } from "marked";
+import { HEADING_UNDERLINE_WIDTH, SEPARATOR_WIDTH } from "../constants.js";
 
 interface MarkdownTextProps {
   content: string;
@@ -72,7 +73,7 @@ function renderToken(
         return (
           <Box key={keyPrefix} marginTop={1} flexDirection="column">
             <Text bold>{inner}</Text>
-            <Text dimColor>{"═".repeat(40)}</Text>
+            <Text dimColor>{"═".repeat(HEADING_UNDERLINE_WIDTH)}</Text>
           </Box>
         );
       }
@@ -170,7 +171,7 @@ function renderToken(
       return (
         <Box key={keyPrefix} marginTop={1} marginBottom={1}>
           <Text dimColor>
-            {"─".repeat(50)}
+            {"─".repeat(SEPARATOR_WIDTH)}
           </Text>
         </Box>
       );

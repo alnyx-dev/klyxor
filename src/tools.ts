@@ -1,7 +1,17 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
-import { MAX_SUBAGENT_DEPTH } from "./config.js";
+import { MAX_SUBAGENT_DEPTH } from "./constants.js";
+import {
+  BASH_TIMEOUT_MS,
+  DEFAULT_READ_FILE_LIMIT,
+  MAX_LIST_FILES_RESULTS,
+  MAX_GREP_RESULTS,
+  PREVIEW,
+  SKIP_DIRS,
+  MODE_PLAN,
+  MODE_BUILD,
+} from "./constants.js";
 
 export type LogFn = (msg: string) => void;
 
@@ -85,7 +95,7 @@ function looksDestructive(command: string): boolean {
 function runBash(command: string): string {
   try {
     const result = execSync(command, {
-      timeout: 120_000,
+      timeout: BASH_TIMEOUT_MS,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -100,7 +110,7 @@ function runBash(command: string): string {
     const stdout = err.stdout || "";
     const stderr = err.stderr || "";
     if (err.message?.includes("timed out")) {
-      return "Error: command timed out after 120s";
+      return `Error: command timed out after ${BASH_TIMEOUT_MS / 1000}s`;
     }
     const parts: string[] = [];
     if (stdout) parts.push(stdout);
@@ -152,7 +162,7 @@ export function makeReadFileTool(): Tool {
     limit?: number
   ): string {
     const start = Math.max(0, offset ?? 0);
-    const maxLines = limit ?? 2000;
+    const maxLines = limit ?? DEFAULT_READ_FILE_LIMIT;
     try {
       const content = fs.readFileSync(filePath, "utf-8");
       const lines = content.split("\n");
@@ -190,7 +200,7 @@ export function makeReadFileTool(): Tool {
         },
         limit: {
           type: "integer",
-          description: "Max lines to return. Default 2000.",
+          description: `Max lines to return. Default ${DEFAULT_READ_FILE_LIMIT}.`,
         },
       },
       required: ["path"],
@@ -330,10 +340,10 @@ export function makeListFilesTool(): Tool {
       if (results.length === 0) {
         return `No files matching '${pat}' in ${base}`;
       }
-      const limited = results.slice(0, 200);
+      const limited = results.slice(0, MAX_LIST_FILES_RESULTS);
       let output = limited.join("\n");
-      if (results.length > 200) {
-        output += `\n... (${results.length - 200} more)`;
+      if (results.length > MAX_LIST_FILES_RESULTS) {
+        output += `\n... (${results.length - MAX_LIST_FILES_RESULTS} more)`;
       }
       return output;
     } catch (e) {
@@ -370,7 +380,7 @@ export function makeGrepTool(): Tool {
     const base = searchPath || ".";
     const results: string[] = [];
     const regex = new RegExp(pattern);
-    const skipDirs = new Set([".git", "__pycache__", "node_modules", ".klyxor"]);
+    const skipDirs = SKIP_DIRS;
 
     function walk(dir: string): void {
       let entries: fs.Dirent[];
@@ -392,7 +402,7 @@ export function makeGrepTool(): Tool {
             for (let i = 0; i < lines.length; i++) {
               if (regex.test(lines[i])) {
                 results.push(`${fpath}:${i + 1}: ${lines[i].trimEnd()}`);
-                if (results.length >= 200) {
+                if (results.length >= MAX_GREP_RESULTS) {
                   return;
                 }
               }
@@ -415,8 +425,8 @@ export function makeGrepTool(): Tool {
     }
 
     let output = results.join("\n");
-    if (results.length >= 200) {
-      output += "\n... (truncated at 200 matches)";
+    if (results.length >= MAX_GREP_RESULTS) {
+      output += `\n... (truncated at ${MAX_GREP_RESULTS} matches)`;
     }
     return output;
   }
@@ -460,9 +470,9 @@ function makeDelegateTool(
     if (depth >= MAX_SUBAGENT_DEPTH) {
       return `Error: max delegation depth (${MAX_SUBAGENT_DEPTH}) reached, cannot delegate further.`;
     }
-    const actualMode = mode === "plan" || mode === "build" ? mode : "build";
+    const actualMode = mode === MODE_PLAN || mode === MODE_BUILD ? mode : MODE_BUILD;
     log(
-      `↳ delegating (mode=${actualMode}, depth=${depth + 1}): ${task.slice(0, 100)}`
+      `↳ delegating (mode=${actualMode}, depth=${depth + 1}): ${task.slice(0, PREVIEW.task)}`
     );
     return runAgentFn(task, actualMode, depth + 1, log);
   }
@@ -483,7 +493,7 @@ function makeDelegateTool(
         },
         mode: {
           type: "string",
-          enum: ["plan", "build"],
+          enum: [MODE_PLAN, MODE_BUILD],
           description:
             "plan = read-only investigation/planning only; build = full execution. Default build.",
         },

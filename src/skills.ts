@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { SKILLS_DIR } from "./config.js";
 import { createTool, type Tool } from "./tools.js";
+import { SKILL_FILE_EXTENSION, PREVIEW } from "./constants.js";
 
 export interface SkillInfo {
   path: string;
@@ -23,7 +24,7 @@ export function discoverSkills(): Record<string, SkillInfo> {
   }
 
   for (const fname of entries) {
-    if (!fname.endsWith(".md")) continue;
+    if (!fname.endsWith(SKILL_FILE_EXTENSION)) continue;
     const skillPath = path.join(SKILLS_DIR, fname);
     try {
       const text = fs.readFileSync(skillPath, "utf-8");
@@ -45,7 +46,7 @@ export function discoverSkills(): Record<string, SkillInfo> {
 
       skills[fname.slice(0, -3)] = {
         path: skillPath,
-        description: description.slice(0, 200),
+        description: description.slice(0, PREVIEW.skillDescription),
       };
     } catch {
       // skip unreadable files

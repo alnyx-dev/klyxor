@@ -5,16 +5,19 @@ import { SessionManager } from "../sessions.js";
 import {
   getProviders,
   getActiveProviderName,
+  getActiveModel,
   removeProvider,
+  addModelToProvider,
+  addProvider,
+  setActiveModel,
   saveConfig,
 } from "../config.js";
-
-type PaletteItem =
-  | { type: "header"; label: string }
-  | { type: "session"; name: string; mode: string; nMsgs: number; isCurrent: boolean }
-  | { type: "provider"; name: string; model: string; baseUrl: string; isActive: boolean }
-  | { type: "mode"; mode: string; label: string; description: string; isActive: boolean }
-  | { type: "action"; id: string; label: string; icon: string };
+import {
+  BRAND_COLOR,
+  PALETTE_UI_HEIGHT,
+  MIN_VIEWPORT_HEIGHT,
+  SESSION_NAME_PREFIX,
+} from "../constants.js";
 
 export interface CommandPaletteProps {
   manager: SessionManager;
@@ -25,78 +28,124 @@ export interface CommandPaletteProps {
   onCancel: () => void;
 }
 
+// ── Section definitions ──────────────────────────────────
+type SectionId = "sessions" | "providers" | "mode" | "actions";
+
+interface SectionDef {
+  id: SectionId;
+  label: string;
+  shortcut: string;
+}
+
+const SECTIONS: SectionDef[] = [
+  { id: "sessions", label: "Sessions", shortcut: "1" },
+  { id: "providers", label: "Providers", shortcut: "2" },
+  { id: "mode", label: "Mode", shortcut: "3" },
+  { id: "actions", label: "Actions", shortcut: "4" },
+];
+
 const MODE_INFO: Record<string, { label: string; description: string }> = {
   plan: { label: "Plan", description: "read-only" },
   build: { label: "Build", description: "full access" },
 };
 
-const HEADER_WIDTH = 38;
+// ── Item types per section ───────────────────────────────
+interface SessionItem {
+  type: "session";
+  name: string;
+  mode: string;
+  nMsgs: number;
+  isCurrent: boolean;
+}
 
-function buildItems(manager: SessionManager): PaletteItem[] {
-  const items: PaletteItem[] = [];
+interface ProviderItem {
+  type: "provider";
+  name: string;
+  model: string;
+  models: string[];
+  baseUrl: string;
+  isActive: boolean;
+}
 
-  // Sessions
-  items.push({ type: "header", label: "Sessions" });
-  for (const name of manager.order) {
-    const s = manager.sessions.get(name);
-    if (!s) continue;
-    items.push({
-      type: "session",
-      name,
-      mode: s.mode,
-      nMsgs: s.messages.filter((m) => m.role === "user").length,
-      isCurrent: name === manager.current,
-    });
+interface ModeItem {
+  type: "mode";
+  mode: string;
+  label: string;
+  description: string;
+  isActive: boolean;
+}
+
+interface ActionItem {
+  type: "action";
+  id: string;
+  label: string;
+  icon: string;
+}
+
+type SectionItem = SessionItem | ProviderItem | ModeItem | ActionItem;
+
+// ── Build items per section ──────────────────────────────
+function buildSectionItems(section: SectionId, manager: SessionManager): SectionItem[] {
+  const items: SectionItem[] = [];
+
+  switch (section) {
+    case "sessions":
+      for (const name of manager.order) {
+        const s = manager.sessions.get(name);
+        if (!s) continue;
+        items.push({
+          type: "session",
+          name,
+          mode: s.mode,
+          nMsgs: s.messages.filter((m) => m.role === "user").length,
+          isCurrent: name === manager.current,
+        });
+      }
+      break;
+
+    case "providers": {
+      const providers = getProviders();
+      const activeProviderName = getActiveProviderName();
+      for (const [name, p] of Object.entries(providers)) {
+        items.push({
+          type: "provider",
+          name,
+          model: getActiveModel(p),
+          models: p.models || [],
+          baseUrl: p.base_url,
+          isActive: name === activeProviderName,
+        });
+      }
+      break;
+    }
+
+    case "mode": {
+      const currentMode = manager.active.mode;
+      for (const [mode, info] of Object.entries(MODE_INFO)) {
+        items.push({
+          type: "mode",
+          mode,
+          label: info.label,
+          description: info.description,
+          isActive: mode === currentMode,
+        });
+      }
+      break;
+    }
+
+    case "actions":
+      items.push({ type: "action", id: "new-session", label: "New Session", icon: "+" });
+      items.push({ type: "action", id: "reset-session", label: "Reset Session", icon: "r" });
+      items.push({ type: "action", id: "skills", label: "Skills", icon: "s" });
+      items.push({ type: "action", id: "help", label: "Help", icon: "?" });
+      break;
   }
-
-  // Providers
-  items.push({ type: "header", label: "Providers" });
-  const providers = getProviders();
-  const activeProviderName = getActiveProviderName();
-  for (const [name, p] of Object.entries(providers)) {
-    items.push({
-      type: "provider",
-      name,
-      model: p.model,
-      baseUrl: p.base_url,
-      isActive: name === activeProviderName,
-    });
-  }
-
-  // Mode
-  items.push({ type: "header", label: "Mode" });
-  const currentMode = manager.active.mode;
-  for (const [mode, info] of Object.entries(MODE_INFO)) {
-    items.push({
-      type: "mode",
-      mode,
-      label: info.label,
-      description: info.description,
-      isActive: mode === currentMode,
-    });
-  }
-
-  // Actions
-  items.push({ type: "header", label: "Actions" });
-  items.push({ type: "action", id: "new-session", label: "New Session", icon: "+" });
-  items.push({ type: "action", id: "reset-session", label: "Reset Session", icon: "r" });
-  items.push({ type: "action", id: "skills", label: "Skills", icon: "s" });
-  items.push({ type: "action", id: "help", label: "Help", icon: "?" });
 
   return items;
 }
 
-function selectableIndices(items: PaletteItem[]): number[] {
-  const indices: number[] = [];
-  for (let i = 0; i < items.length; i++) {
-    if (items[i].type !== "header") {
-      indices.push(i);
-    }
-  }
-  return indices;
-}
-
-export const CommandPalette = React.memo(function CommandPalette({
+// ── Component ────────────────────────────────────────────
+export function CommandPalette({
   manager,
   onSelectSession,
   onSelectProvider,
@@ -105,13 +154,21 @@ export const CommandPalette = React.memo(function CommandPalette({
   onCancel,
 }: CommandPaletteProps) {
   const { stdout } = useStdout();
-  const items = buildItems(manager);
-  const selectables = selectableIndices(items);
 
+  const [activeTab, setActiveTab] = useState<SectionId>("sessions");
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
-  const [subMode, setSubMode] = useState<"list" | "add-session" | "confirm-delete">("list");
+  const [subMode, setSubMode] = useState<"list" | "add-session" | "add-model" | "add-provider" | "select-model" | "confirm-delete">("list");
   const [addInput, setAddInput] = useState("");
+  const [modelTarget, setModelTarget] = useState<string | null>(null);
+  const [selectModelTarget, setSelectModelTarget] = useState<string | null>(null);
+  const [providerForm, setProviderForm] = useState<{
+    step: number;
+    name: string;
+    base_url: string;
+    model: string;
+    api_key: string;
+  }>({ step: 0, name: "", base_url: "", model: "", api_key: "" });
   const [deleteTarget, setDeleteTarget] = useState<{
     name: string;
     kind: "session" | "provider";
@@ -119,12 +176,10 @@ export const CommandPalette = React.memo(function CommandPalette({
   const [, forceRender] = useState(0);
   const refresh = useCallback(() => forceRender((n) => n + 1), []);
 
-  const maxCursor = Math.max(0, selectables.length - 1);
+  const items = useMemo(() => buildSectionItems(activeTab, manager), [activeTab, manager]);
+  const maxCursor = Math.max(0, items.length - 1);
+  const viewportHeight = Math.max(MIN_VIEWPORT_HEIGHT, stdout.rows - PALETTE_UI_HEIGHT - 3); // extra rows for tabs + footer
 
-  // Calculate viewport: terminal height minus fixed elements (header, footer, borders, padding)
-  const viewportHeight = Math.max(5, stdout.rows - 8);
-
-  // Ensure cursor is visible within viewport
   const ensureVisible = useCallback(
     (newCursor: number) => {
       if (newCursor < scrollOffset) {
@@ -136,12 +191,78 @@ export const CommandPalette = React.memo(function CommandPalette({
     [scrollOffset, viewportHeight]
   );
 
+  // ── Tab index helpers ──────────────────────────────────
+  const tabIndex = SECTIONS.findIndex((s) => s.id === activeTab);
+
+  const switchTab = useCallback(
+    (delta: number) => {
+      const next = (tabIndex + delta + SECTIONS.length) % SECTIONS.length;
+      setActiveTab(SECTIONS[next].id);
+      setCursor(0);
+      setScrollOffset(0);
+    },
+    [tabIndex]
+  );
+
+  // ── Keyboard handling ──────────────────────────────────
   useInput((inputStr, key) => {
-    // -- add-session sub-mode: only handle Escape, let TextInput do the rest --
+    // -- add-session sub-mode --
     if (subMode === "add-session") {
       if (key.escape) {
         setSubMode("list");
         setAddInput("");
+      }
+      return;
+    }
+
+    // -- add-model sub-mode --
+    if (subMode === "add-model") {
+      if (key.escape) {
+        setSubMode("list");
+        setAddInput("");
+        setModelTarget(null);
+      }
+      return;
+    }
+
+    // -- add-provider sub-mode --
+    if (subMode === "add-provider") {
+      if (key.escape) {
+        setSubMode("list");
+        setProviderForm({ step: 0, name: "", base_url: "", model: "", api_key: "" });
+        setAddInput("");
+      }
+      return;
+    }
+
+    // -- select-model sub-mode --
+    if (subMode === "select-model") {
+      if (key.escape) {
+        setSubMode("list");
+        setSelectModelTarget(null);
+        setCursor(0);
+        setScrollOffset(0);
+      }
+      if ((key.upArrow || inputStr === "k") && selectModelTarget) {
+        const models = getProviders()[selectModelTarget]?.models || [];
+        setCursor((c) => Math.max(0, c - 1));
+      }
+      if ((key.downArrow || inputStr === "j") && selectModelTarget) {
+        const models = getProviders()[selectModelTarget]?.models || [];
+        setCursor((c) => Math.min(models.length - 1, c + 1));
+      }
+      if (key.return && selectModelTarget) {
+        const models = getProviders()[selectModelTarget]?.models || [];
+        const selectedModel = models[cursor];
+        if (selectedModel) {
+          setActiveModel(selectModelTarget, selectedModel);
+          saveConfig();
+        }
+        setSubMode("list");
+        setSelectModelTarget(null);
+        setCursor(0);
+        setScrollOffset(0);
+        refresh();
       }
       return;
     }
@@ -165,7 +286,7 @@ export const CommandPalette = React.memo(function CommandPalette({
         }
         setSubMode("list");
         setDeleteTarget(null);
-        setCursor((c) => Math.min(c, Math.max(0, selectables.length - 1)));
+        setCursor((c) => Math.min(c, Math.max(0, items.length - 1)));
         refresh();
         return;
       }
@@ -177,11 +298,28 @@ export const CommandPalette = React.memo(function CommandPalette({
       return;
     }
 
-    // -- list mode --
+    // -- list mode (normal) --
     if (key.escape) {
       onCancel();
       return;
     }
+
+    // Tab switching: left/right arrows or number keys
+    if (key.leftArrow || inputStr === "h") {
+      switchTab(-1);
+      return;
+    }
+    if (key.rightArrow || inputStr === "l") {
+      switchTab(1);
+      return;
+    }
+    // Number shortcuts for tabs
+    if (inputStr === "1") { setActiveTab("sessions"); setCursor(0); setScrollOffset(0); return; }
+    if (inputStr === "2") { setActiveTab("providers"); setCursor(0); setScrollOffset(0); return; }
+    if (inputStr === "3") { setActiveTab("mode"); setCursor(0); setScrollOffset(0); return; }
+    if (inputStr === "4") { setActiveTab("actions"); setCursor(0); setScrollOffset(0); return; }
+
+    // Item navigation
     if (key.upArrow || inputStr === "k") {
       setCursor((c) => {
         const next = Math.max(0, c - 1);
@@ -199,16 +337,24 @@ export const CommandPalette = React.memo(function CommandPalette({
       return;
     }
 
-    if (key.return && selectables.length > 0) {
-      const itemIdx = selectables[cursor];
-      if (itemIdx === undefined) return;
-      const item = items[itemIdx];
+    // Select item
+    if (key.return && items.length > 0) {
+      const item = items[cursor];
+      if (!item) return;
       switch (item.type) {
         case "session":
           onSelectSession(item.name);
           break;
         case "provider":
-          onSelectProvider(item.name);
+          if (item.models.length > 0) {
+            // Show model selection for this provider
+            setSelectModelTarget(item.name);
+            setSubMode("select-model");
+            setCursor(0);
+            setScrollOffset(0);
+          } else {
+            onSelectProvider(item.name);
+          }
           break;
         case "mode":
           onSwitchMode(item.mode);
@@ -225,23 +371,36 @@ export const CommandPalette = React.memo(function CommandPalette({
       return;
     }
 
-    // n = new session (when cursor is on a session)
-    if (inputStr === "n" && selectables.length > 0) {
-      const itemIdx = selectables[cursor];
-      if (itemIdx === undefined) return;
-      const item = items[itemIdx];
-      if (item.type === "session") {
-        setSubMode("add-session");
+    // n = new session
+    if (inputStr === "n" && activeTab === "sessions") {
+      setSubMode("add-session");
+      setAddInput("");
+      return;
+    }
+
+    // a = add model (in providers tab)
+    if (inputStr === "a" && activeTab === "providers" && items.length > 0) {
+      const item = items[cursor];
+      if (item && item.type === "provider") {
+        setModelTarget(item.name);
+        setSubMode("add-model");
         setAddInput("");
       }
       return;
     }
 
+    // A = add provider (in providers tab)
+    if (inputStr === "A" && activeTab === "providers") {
+      setSubMode("add-provider");
+      setProviderForm({ step: 0, name: "", base_url: "", model: "", api_key: "" });
+      setAddInput("");
+      return;
+    }
+
     // d = delete
-    if (inputStr === "d" && selectables.length > 0) {
-      const itemIdx = selectables[cursor];
-      if (itemIdx === undefined) return;
-      const item = items[itemIdx];
+    if (inputStr === "d" && items.length > 0) {
+      const item = items[cursor];
+      if (!item) return;
       if (item.type === "session" && item.name !== manager.current) {
         setDeleteTarget({ name: item.name, kind: "session" });
         setSubMode("confirm-delete");
@@ -263,57 +422,59 @@ export const CommandPalette = React.memo(function CommandPalette({
     [onAction]
   );
 
-  // ── add-session sub-mode ──────────────────────
-  if (subMode === "add-session") {
-    return (
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor="#DA7756"
-        padding={1}
-      >
-        <Text bold>New session name:</Text>
-        <Box marginTop={1}>
-          <TextInput
-            value={addInput}
-            onChange={setAddInput}
-            onSubmit={handleAddSubmit}
-            placeholder={`session-${manager._counter + 1}`}
-          />
-        </Box>
-        <Box marginTop={1}>
-          <Text dimColor>Enter = create, Esc = cancel</Text>
-        </Box>
-      </Box>
-    );
-  }
+  const handleAddModelSubmit = useCallback(
+    (text: string) => {
+      const model = text.trim();
+      if (model && modelTarget) {
+        addModelToProvider(modelTarget, model);
+        saveConfig();
+      }
+      setSubMode("list");
+      setAddInput("");
+      setModelTarget(null);
+      refresh();
+    },
+    [modelTarget, refresh]
+  );
 
-  // ── confirm-delete sub-mode ───────────────────
-  if (subMode === "confirm-delete" && deleteTarget) {
-    return (
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor="#DA7756"
-        padding={1}
-      >
-        <Text bold color="red">
-          Delete {deleteTarget.kind} &quot;{deleteTarget.name}&quot;?
-        </Text>
-        <Box marginTop={1}>
-          <Text>Press y to confirm, n or Esc to cancel</Text>
-        </Box>
-      </Box>
-    );
-  }
+  const handleAddProviderSubmit = useCallback(
+    (text: string) => {
+      const value = text.trim();
+      const step = providerForm.step;
 
-  // ── main list ─────────────────────────────────
-  const safeCursor = Math.min(cursor, Math.max(0, selectables.length - 1));
-  const selectedIdx = selectables[safeCursor];
+      if (step === 0) {
+        // Name
+        setProviderForm((f) => ({ ...f, step: 1, name: value }));
+        setAddInput("");
+      } else if (step === 1) {
+        // Base URL
+        setProviderForm((f) => ({ ...f, step: 2, base_url: value }));
+        setAddInput("");
+      } else if (step === 2) {
+        // Model
+        setProviderForm((f) => ({ ...f, step: 3, model: value }));
+        setAddInput("");
+      } else if (step === 3) {
+        // API Key - final step
+        const { name, base_url, model } = providerForm;
+        if (name && base_url && model) {
+          addProvider(name, base_url, model, value);
+          saveConfig();
+        }
+        setSubMode("list");
+        setProviderForm({ step: 0, name: "", base_url: "", model: "", api_key: "" });
+        setAddInput("");
+        refresh();
+      }
+    },
+    [providerForm, refresh]
+  );
 
-  // Virtual scrolling: only render visible items
+  // ── Pre-hooks for all render paths (must be before any early returns) ──
+  const safeCursor = Math.min(cursor, Math.max(0, items.length - 1));
+
   const visibleItems = useMemo(() => {
-    const result: { item: PaletteItem; originalIndex: number }[] = [];
+    const result: { item: SectionItem; originalIndex: number }[] = [];
     let visibleCount = 0;
 
     for (let i = 0; i < items.length; i++) {
@@ -330,43 +491,197 @@ export const CommandPalette = React.memo(function CommandPalette({
   const hasItemsAbove = scrollOffset > 0;
   const hasItemsBelow = scrollOffset + viewportHeight < items.length;
 
+  // ── add-session sub-mode ──────────────────────────────
+  if (subMode === "add-session") {
+    return (
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={BRAND_COLOR}
+        padding={1}
+      >
+        <Text bold>New session name:</Text>
+        <Box marginTop={1}>
+          <TextInput
+            value={addInput}
+            onChange={setAddInput}
+            onSubmit={handleAddSubmit}
+            placeholder={`${SESSION_NAME_PREFIX}${manager._counter + 1}`}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter = create, Esc = cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // ── add-model sub-mode ──────────────────────────────
+  if (subMode === "add-model" && modelTarget) {
+    return (
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={BRAND_COLOR}
+        padding={1}
+      >
+        <Text bold>
+          Add model to <Text color={BRAND_COLOR}>{modelTarget}</Text>:
+        </Text>
+        <Box marginTop={1}>
+          <TextInput
+            value={addInput}
+            onChange={setAddInput}
+            onSubmit={handleAddModelSubmit}
+            placeholder="gpt-4o"
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter = add, Esc = cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // ── add-provider sub-mode ──────────────────────────
+  if (subMode === "add-provider") {
+    const step = providerForm.step;
+    const labels = ["Provider name", "Base URL", "Model name", "API Key"];
+    const placeholders = [
+      "my-provider",
+      "https://api.openai.com/v1",
+      "gpt-4o",
+      "sk-...",
+    ];
+    const showMask = step === 3; // mask API key
+
+    return (
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={BRAND_COLOR}
+        padding={1}
+      >
+        <Text bold>
+          Add provider <Text dimColor>({step + 1}/4)</Text>
+        </Text>
+        <Box marginTop={1}>
+          <Text>
+            <Text color={BRAND_COLOR}>{labels[step]}:</Text>{" "}
+          </Text>
+          <TextInput
+            value={addInput}
+            onChange={setAddInput}
+            onSubmit={handleAddProviderSubmit}
+            placeholder={placeholders[step]}
+            mask={showMask ? "*" : undefined}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter = next, Esc = cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // ── confirm-delete sub-mode ───────────────────────────
+  if (subMode === "confirm-delete" && deleteTarget) {
+    return (
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={BRAND_COLOR}
+        padding={1}
+      >
+        <Text bold color="red">
+          Delete {deleteTarget.kind} &quot;{deleteTarget.name}&quot;?
+        </Text>
+        <Box marginTop={1}>
+          <Text>Press y to confirm, n or Esc to cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // ── select-model sub-mode ─────────────────────────────
+  if (subMode === "select-model" && selectModelTarget) {
+    const provider = getProviders()[selectModelTarget];
+    const models = provider?.models || [];
+    const currentModel = provider ? getActiveModel(provider) : "";
+
+    return (
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={BRAND_COLOR}
+        padding={1}
+      >
+        <Text bold>
+          Select model for <Text color={BRAND_COLOR}>{selectModelTarget}</Text>:
+        </Text>
+        <Box marginTop={1} flexDirection="column">
+          {models.map((model, i) => (
+            <Text key={model}>
+              {i === cursor ? (
+                <Text color={BRAND_COLOR}>{"▸ "}</Text>
+              ) : (
+                <Text>{"  "}</Text>
+              )}
+              <Text
+                bold={model === currentModel}
+                color={model === currentModel ? BRAND_COLOR : undefined}
+              >
+                {model === currentModel ? `* ${model}` : `  ${model}`}
+              </Text>
+            </Text>
+          ))}
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter = select, Esc = cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor="#DA7756"
+      borderColor={BRAND_COLOR}
       padding={1}
     >
-      <Text bold>Command Palette</Text>
+      {/* ── Tab bar ─────────────────────────────────────── */}
+      <Box>
+        {SECTIONS.map((section, i) => {
+          const isActive = section.id === activeTab;
+          return (
+            <Text key={section.id}>
+              {i > 0 ? " " : ""}
+              {isActive ? (
+                <Text bold color={BRAND_COLOR}>
+                  {section.label}
+                </Text>
+              ) : (
+                <Text dimColor>{section.label}</Text>
+              )}
+            </Text>
+          );
+        })}
+      </Box>
 
+      {/* ── Section content ─────────────────────────────── */}
       <Box marginTop={1} flexDirection="column">
         {items.length === 0 ? (
-          <Text dimColor>No items available</Text>
+          <Text dimColor>No items</Text>
         ) : (
           <>
             {hasItemsAbove && (
-              <Text dimColor>  ↑ {scrollOffset} more items above</Text>
+              <Text dimColor>  ↑ {scrollOffset} more</Text>
             )}
             {visibleItems.map(({ item, originalIndex: i }) => {
-              if (item.type === "header") {
-                const headerLabel = `── ${item.label} `;
-                const pad = Math.max(
-                  1,
-                  HEADER_WIDTH - headerLabel.length
-                );
-                return (
-                  <Box key={`h-${i}`} marginTop={i > 0 ? 1 : 0}>
-                    <Text dimColor>
-                      {headerLabel}
-                      {"─".repeat(pad)}
-                    </Text>
-                  </Box>
-                );
-              }
-
-              const isSelected = i === selectedIdx;
+              const isSelected = i === safeCursor;
               const prefix = isSelected ? (
-                <Text color="#DA7756">{"▸ "}</Text>
+                <Text color={BRAND_COLOR}>{"▸ "}</Text>
               ) : (
                 <Text>{"  "}</Text>
               );
@@ -378,36 +693,39 @@ export const CommandPalette = React.memo(function CommandPalette({
                       {prefix}
                       <Text
                         bold={item.isCurrent}
-                        color={item.isCurrent ? "#DA7756" : undefined}
+                        color={item.isCurrent ? BRAND_COLOR : undefined}
                       >
-                        {item.isCurrent
-                          ? `*${item.name}`
-                          : ` ${item.name}`}
+                        {item.isCurrent ? `*${item.name}` : ` ${item.name}`}
                       </Text>
                       <Text>
                         {" "}
-                        [{item.mode}] {item.nMsgs} msg
-                        {item.nMsgs !== 1 ? "s" : ""}
+                        [{item.mode}] {item.nMsgs} msg{item.nMsgs !== 1 ? "s" : ""}
                       </Text>
                     </Text>
                   );
                 case "provider":
                   return (
-                    <Text key={item.name}>
-                      {prefix}
-                      <Text
-                        bold={item.isActive}
-                        color={item.isActive ? "#DA7756" : undefined}
-                      >
-                        {item.isActive
-                          ? `*${item.name}`
-                          : ` ${item.name}`}
-                      </Text>
+                    <Box key={item.name} flexDirection="column">
                       <Text>
-                        {" "}
-                        [{item.model}] {item.baseUrl}
+                        {prefix}
+                        <Text
+                          bold={item.isActive}
+                          color={item.isActive ? BRAND_COLOR : undefined}
+                        >
+                          {item.isActive ? `*${item.name}` : ` ${item.name}`}
+                        </Text>
+                        <Text>
+                          {" "}
+                          [{item.model}] {item.baseUrl}
+                        </Text>
                       </Text>
-                    </Text>
+                      {item.models.length > 0 && (
+                        <Text dimColor>
+                          {"    "}
+                          models: {item.models.join(", ")}
+                        </Text>
+                      )}
+                    </Box>
                   );
                 case "mode":
                   return (
@@ -415,7 +733,7 @@ export const CommandPalette = React.memo(function CommandPalette({
                       {prefix}
                       <Text
                         bold={item.isActive}
-                        color={item.isActive ? "#DA7756" : undefined}
+                        color={item.isActive ? BRAND_COLOR : undefined}
                       >
                         {item.isActive ? "* " : "  "}
                       </Text>
@@ -438,17 +756,20 @@ export const CommandPalette = React.memo(function CommandPalette({
               }
             })}
             {hasItemsBelow && (
-              <Text dimColor>  ↓ {items.length - scrollOffset - viewportHeight} more items below</Text>
+              <Text dimColor>  ↓ {items.length - scrollOffset - viewportHeight} more</Text>
             )}
           </>
         )}
       </Box>
 
+      {/* ── Footer ──────────────────────────────────────── */}
       <Box marginTop={1}>
         <Text dimColor>
-          Enter = select, Esc = close, j/k = navigate
+          h/l = tab, j/k = nav, Enter = select, Esc = close
+          {activeTab === "sessions" ? ", n = new, d = delete" : ""}
+          {activeTab === "providers" ? ", a = add model, A = add provider, d = delete" : ""}
         </Text>
       </Box>
     </Box>
   );
-});
+}

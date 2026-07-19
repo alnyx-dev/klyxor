@@ -1,4 +1,5 @@
-import { getActiveProvider, getActiveProviderName } from "./config.js";
+import { getActiveProvider, getActiveProviderName, getActiveModel } from "./config.js";
+import { LLM_DEFAULTS, LLM_TIMEOUT_MS } from "./constants.js";
 
 export interface LlmMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -36,20 +37,20 @@ export async function callLlm(
     Authorization: `Bearer ${provider.api_key}`,
   };
   const payload = {
-    model: provider.model,
+    model: getActiveModel(provider),
     messages,
     tools,
-    tool_choice: "auto",
-    temperature: 0.1,
-    max_tokens: 4096,
+    tool_choice: LLM_DEFAULTS.toolChoice,
+    temperature: LLM_DEFAULTS.temperature,
+    max_tokens: LLM_DEFAULTS.maxTokens,
   };
 
   try {
-    const resp = await fetch(`${provider.base_url}/chat/completions`, {
+    const resp = await fetch(`${provider.base_url}${LLM_DEFAULTS.endpoint}`, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     });
 
     if (!resp.ok) {

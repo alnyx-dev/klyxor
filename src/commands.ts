@@ -9,6 +9,7 @@ import {
 } from "./config.js";
 import { discoverSkills } from "./skills.js";
 import { SessionManager, saveState } from "./sessions.js";
+import { MODE_PLAN, MODE_BUILD, DEFAULT_MODE } from "./constants.js";
 
 export const HELP_TEXT = `\
 Commands:
@@ -47,13 +48,13 @@ export function handleCommand(
   }
 
   if (cmd === "/plan") {
-    manager.active.setMode("plan");
+    manager.active.setMode(MODE_PLAN);
     saveState(manager);
     return { type: "handled", message: "→ switched to PLAN mode (read-only)" };
   }
 
   if (cmd === "/build") {
-    manager.active.setMode("build");
+    manager.active.setMode(MODE_BUILD);
     saveState(manager);
     return {
       type: "handled",
@@ -100,7 +101,7 @@ export function handleCommand(
 
   if (cmd === "/new") {
     try {
-      const created = manager.newSession(arg || undefined, "build", true);
+      const created = manager.newSession(arg || undefined, DEFAULT_MODE, true);
       saveState(manager);
       return {
         type: "handled",

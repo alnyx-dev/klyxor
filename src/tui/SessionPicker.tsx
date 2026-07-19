@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import { SessionManager, saveState } from "../sessions.js";
+import { BRAND_COLOR } from "../constants.js";
 
 interface SessionPickerProps {
   manager: SessionManager;
@@ -52,7 +53,7 @@ export function SessionPicker({ manager, onSelect, onCancel }: SessionPickerProp
   });
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" padding={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={BRAND_COLOR} padding={1}>
       <Text bold>Select session:</Text>
       <Box marginTop={1} flexDirection="column">
         {rows.length === 0 ? (
@@ -61,7 +62,7 @@ export function SessionPicker({ manager, onSelect, onCancel }: SessionPickerProp
           rows.map((row, i) => (
             <Text key={row.name}>
               <Text>{i === cursor ? "▸ " : "  "}</Text>
-              <Text bold={row.isCurrent} color={row.isCurrent ? "cyan" : undefined}>
+              <Text bold={row.isCurrent} color={row.isCurrent ? BRAND_COLOR : undefined}>
                 {row.isCurrent ? `*${row.name}` : ` ${row.name}`}
               </Text>
               <Text> [{row.mode}] {row.nMsgs} msg{row.nMsgs !== 1 ? "s" : ""}</Text>
