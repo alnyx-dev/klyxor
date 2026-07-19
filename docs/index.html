@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klyxor — AI Coding Agent</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #09090b;
+            --surface: #18181b;
+            --surface-hover: #27272a;
+            --border: #27272a;
+            --border-subtle: #1e1e22;
+            --text: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #52525b;
+            --accent: #51ff48;
+            --accent-dim: rgba(81, 255, 72, 0.08);
+            --accent-border: rgba(81, 255, 72, 0.15);
+            --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Scroll reveal */
+        .reveal {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reveal-delay-1 { transition-delay: 0.08s; }
+        .reveal-delay-2 { transition-delay: 0.16s; }
+        .reveal-delay-3 { transition-delay: 0.24s; }
+
+        /* ============================================
+           HERO
+           ============================================ */
+        .hero {
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            font-family: var(--mono);
+            font-size: clamp(3.5rem, 9vw, 6rem);
+            font-weight: 800;
+            color: var(--text);
+            letter-spacing: -3px;
+            margin-bottom: 1.25rem;
+        }
+
+        .logo .accent {
+            color: var(--accent);
+        }
+
+        .tagline {
+            font-size: clamp(1rem, 2.2vw, 1.2rem);
+            color: var(--text-secondary);
+            max-width: 480px;
+            margin: 0 auto 2.5rem;
+            line-height: 1.6;
+            letter-spacing: -0.01em;
+        }
+
+        .tagline strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .install-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .install-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.875rem 1.25rem;
+            font-family: var(--mono);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: border-color 0.2s;
+        }
+
+        .install-box:hover {
+            border-color: var(--accent-border);
+        }
+
+        .install-box .prompt {
+            color: var(--accent);
+            user-select: none;
+        }
+
+        .install-box code {
+            color: var(--text);
+        }
+
+        .copy-btn {
+            background: var(--accent-dim);
+            border: 1px solid var(--accent-border);
+            color: var(--accent);
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: var(--sans);
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            transition: all 0.15s;
+            text-transform: uppercase;
+        }
+
+        .copy-btn:hover {
+            background: rgba(81, 255, 72, 0.15);
+        }
+
+        .copy-btn.copied {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+        }
+
+        .hero-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .hero-meta code {
+            color: var(--text-secondary);
+            background: var(--surface);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+        }
+
+        /* ============================================
+           SECTION SHARED
+           ============================================ */
+        .section {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .section-header {
+            margin-bottom: 2.5rem;
+        }
+
+        .section-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            color: var(--accent);
+            margin-bottom: 0.6rem;
+        }
+
+        .section-title {
+            font-size: clamp(1.6rem, 3.5vw, 2.25rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            color: var(--text);
+        }
+
+        .divider {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .divider-line {
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ============================================
+           FEATURES
+           ============================================ */
+        .features-section {
+            padding-top: 7rem;
+            padding-bottom: 5rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1rem;
+        }
+
+        .feature-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.75rem;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--surface-hover);
+            transform: translateY(-1px);
+        }
+
+        .feature-card.large {
+            grid-column: span 7;
+            padding: 2.25rem;
+        }
+
+        .feature-card.large .feature-icon {
+            width: 48px;
+            height: 48px;
+        }
+
+        .feature-card.large .feature-title {
+            font-size: 1.25rem;
+        }
+
+        .feature-card.large .feature-desc {
+            font-size: 0.92rem;
+            max-width: 380px;
+        }
+
+        .feature-card.medium {
+            grid-column: span 5;
+        }
+
+        .feature-card.small {
+            grid-column: span 4;
+        }
+
+        .feature-card.small .feature-desc {
+            font-size: 0.85rem;
+        }
+
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--accent-dim);
+            border: 1px solid var(--accent-border);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.1rem;
+        }
+
+        .feature-icon svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--accent);
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        .feature-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.01em;
+        }
+
+        .feature-desc {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ============================================
+           QUICK START
+           ============================================ */
+        .quickstart-section {
+            padding-top: 4rem;
+            padding-bottom: 8rem;
+        }
+
+        .code-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            max-width: 680px;
+            overflow: hidden;
+        }
+
+        .code-block-body {
+            padding: 1.5rem;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            line-height: 2;
+        }
+
+        .code-block-body .comment {
+            color: var(--text-muted);
+        }
+
+        .code-block-body .prompt {
+            color: var(--accent);
+            user-select: none;
+        }
+
+        .code-block-body .cmd {
+            color: var(--text);
+        }
+
+        .code-block-body .flag {
+            color: var(--text-secondary);
+        }
+
+        .code-block-body .input {
+            color: var(--text-muted);
+        }
+
+        /* ============================================
+           COMMANDS
+           ============================================ */
+        .commands-section {
+            padding-top: 4rem;
+            padding-bottom: 7rem;
+        }
+
+        .commands-table {
+            max-width: 680px;
+            text-align: left;
+        }
+
+        .cmd-row {
+            display: flex;
+            gap: 2rem;
+            padding: 0.7rem 0;
+            border-bottom: 1px solid var(--border-subtle);
+            align-items: baseline;
+        }
+
+        .cmd-row:last-child {
+            border-bottom: none;
+        }
+
+        .cmd-name {
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            color: var(--accent);
+            min-width: 160px;
+            flex-shrink: 0;
+        }
+
+        .cmd-desc {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+        }
+
+        /* ============================================
+           CONFIG
+           ============================================ */
+        .config-section {
+            padding-top: 4rem;
+            padding-bottom: 7rem;
+        }
+
+        .config-tree {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.75rem 2rem;
+            max-width: 520px;
+            text-align: left;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            line-height: 2.2;
+        }
+
+        .config-tree .folder {
+            color: var(--accent);
+        }
+
+        .config-tree .file {
+            color: var(--text);
+        }
+
+        .config-tree .comment {
+            color: var(--text-muted);
+            margin-left: 0.75rem;
+        }
+
+        .config-tree .branch {
+            color: var(--text-muted);
+            user-select: none;
+        }
+
+        /* ============================================
+           FOOTER
+           ============================================ */
+        footer {
+            padding: 2.5rem 2rem 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-inner {
+            max-width: 1080px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .footer-logo {
+            font-family: var(--mono);
+            font-weight: 800;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+
+        .footer-logo .accent {
+            color: var(--accent);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 1.25rem;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.15s;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-right {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 768px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .feature-card.large,
+            .feature-card.medium,
+            .feature-card.small {
+                grid-column: span 1;
+            }
+
+            .logo {
+                letter-spacing: -2px;
+            }
+
+            .install-box {
+                flex-direction: column;
+                gap: 0.75rem;
+                width: 100%;
+                max-width: 340px;
+            }
+
+            .install-box code {
+                font-size: 0.8rem;
+                text-align: center;
+            }
+
+            .code-block-body {
+                font-size: 0.75rem;
+                padding: 1.25rem;
+            }
+
+            .cmd-row {
+                flex-direction: column;
+                gap: 0.2rem;
+            }
+
+            .cmd-name {
+                min-width: auto;
+            }
+
+            .config-tree {
+                padding: 1.25rem 1.5rem;
+                font-size: 0.75rem;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                gap: 1.25rem;
+                text-align: center;
+            }
+
+            .footer-left {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .section {
+                padding-left: 1.25rem;
+                padding-right: 1.25rem;
+            }
+
+            .feature-card {
+                padding: 1.5rem;
+            }
+
+            .feature-card.large {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="hero-content">
+        <div class="logo">kly<span class="accent">xor</span></div>
+        <p class="tagline">
+            <strong>AI coding agent</strong> with Plan/Build modes, subagent delegation, skills, and a terminal chat interface.
+        </p>
+        <div class="install-wrapper">
+            <div class="install-box">
+                <span class="prompt">$</span>
+                <code>npm install -g @alnyx/klyxor</code>
+                <button class="copy-btn" id="copyBtn" onclick="copyInstall()">Copy</button>
+            </div>
+            <p class="hero-meta">Requires Node.js 18+. After install, run <code>klyxor</code> in your terminal.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Divider -->
+<div class="divider"><div class="divider-line"></div></div>
+
+<!-- Features -->
+<section class="section features-section">
+    <div class="section-header reveal">
+        <div class="section-label">Capabilities</div>
+        <h2 class="section-title">Built for serious workflows</h2>
+    </div>
+    <div class="features-grid">
+        <div class="feature-card large reveal reveal-delay-1">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <h3 class="feature-title">Plan / Build Modes</h3>
+            <p class="feature-desc">Plan before you code, or jump straight into building. The agent adapts to your workflow with read-only planning or full-access execution.</p>
+        </div>
+        <div class="feature-card medium reveal reveal-delay-2">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </div>
+            <h3 class="feature-title">Subagent Delegation</h3>
+            <p class="feature-desc">Delegate tasks to nested subagents for parallel execution across the codebase.</p>
+        </div>
+
+        <div class="feature-card small reveal reveal-delay-1">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </div>
+            <h3 class="feature-title">Skills System</h3>
+            <p class="feature-desc">Loadable .md skills with triggers, dependency resolution, and auto-matching.</p>
+        </div>
+        <div class="feature-card small reveal reveal-delay-2">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h3 class="feature-title">Todo Lists</h3>
+            <p class="feature-desc">The agent creates and tracks tasks inside the session. All changes visible in chat.</p>
+        </div>
+        <div class="feature-card small reveal reveal-delay-3">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            </div>
+            <h3 class="feature-title">Retry + Backoff</h3>
+            <p class="feature-desc">Automatic retry on LLM failures with exponential backoff.</p>
+        </div>
+
+        <div class="feature-card medium reveal reveal-delay-1">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <h3 class="feature-title">Token & Cost Tracking</h3>
+            <p class="feature-desc">Per-model usage tracking. Use /cost and /tokens to view stats in real time.</p>
+        </div>
+        <div class="feature-card large reveal reveal-delay-2">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            </div>
+            <h3 class="feature-title">Project Context</h3>
+            <p class="feature-desc">Auto-loads AGENTS.md / KLYXOR.md / .klyxor/context.md into the system prompt for seamless project awareness.</p>
+        </div>
+
+        <div class="feature-card small reveal reveal-delay-1">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <h3 class="feature-title">Git Integration</h3>
+            <p class="feature-desc">git_status and git_diff tools for working with repositories.</p>
+        </div>
+        <div class="feature-card small reveal reveal-delay-2">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </div>
+            <h3 class="feature-title">Web Fetch</h3>
+            <p class="feature-desc">Fetch and read web pages directly from the terminal.</p>
+        </div>
+        <div class="feature-card small reveal reveal-delay-3">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <h3 class="feature-title">Session Export</h3>
+            <p class="feature-desc">Export full chat history to markdown with /export.</p>
+        </div>
+
+        <div class="feature-card small reveal reveal-delay-1">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <h3 class="feature-title">Context Compaction</h3>
+            <p class="feature-desc">Auto-summarizes long conversations to preserve context when messages pile up.</p>
+        </div>
+        <div class="feature-card small reveal reveal-delay-2">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h3 class="feature-title">Env API Keys</h3>
+            <p class="feature-desc">API keys via environment variables. Never stored in plain text.</p>
+        </div>
+        <div class="feature-card small reveal reveal-delay-3">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            </div>
+            <h3 class="feature-title">Multi-Provider</h3>
+            <p class="feature-desc">Multiple providers, each with multiple models. Switch on the fly.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Divider -->
+<div class="divider"><div class="divider-line"></div></div>
+
+<!-- Quick Start -->
+<section class="section quickstart-section">
+    <div class="section-header reveal">
+        <div class="section-label">Get Started</div>
+        <h2 class="section-title">Up and running in seconds</h2>
+    </div>
+    <div class="code-block reveal reveal-delay-1">
+        <div class="code-block-body">
+            <span class="comment"># Install globally via npm</span><br>
+            <span class="prompt">$</span> <span class="cmd">npm install -g @alnyx/klyxor</span><br><br>
+            <span class="comment"># Set up a provider</span><br>
+            <span class="prompt">$</span> <span class="cmd">klyxor</span><br>
+            <span class="input">&gt; /connect openai</span><br>
+            <span class="input">&gt; /model gpt-4o</span><br><br>
+            <span class="comment"># Or use an environment variable</span><br>
+            <span class="prompt">$</span> <span class="cmd">export OPENAI_API_KEY=sk-...</span><br>
+            <span class="prompt">$</span> <span class="cmd">klyxor</span><br><br>
+            <span class="comment"># One-shot queries</span><br>
+            <span class="prompt">$</span> <span class="cmd">klyxor <span class="flag">"Write a hello world in Python"</span></span><br>
+            <span class="prompt">$</span> <span class="cmd">klyxor <span class="flag">--plan</span> <span class="flag">"Design a REST API"</span></span>
+        </div>
+    </div>
+</section>
+
+<!-- Divider -->
+<div class="divider"><div class="divider-line"></div></div>
+
+<!-- Commands -->
+<section class="section commands-section">
+    <div class="section-header reveal">
+        <div class="section-label">Commands</div>
+        <h2 class="section-title">Slash commands</h2>
+    </div>
+    <div class="commands-table reveal reveal-delay-1">
+        <div class="cmd-row"><span class="cmd-name">/help</span><span class="cmd-desc">List all commands</span></div>
+        <div class="cmd-row"><span class="cmd-name">/plan</span><span class="cmd-desc">Switch to Plan mode</span></div>
+        <div class="cmd-row"><span class="cmd-name">/build</span><span class="cmd-desc">Switch to Build mode</span></div>
+        <div class="cmd-row"><span class="cmd-name">/model [name]</span><span class="cmd-desc">Show or switch model</span></div>
+        <div class="cmd-row"><span class="cmd-name">/connect [name]</span><span class="cmd-desc">Connect a provider (provider/model)</span></div>
+        <div class="cmd-row"><span class="cmd-name">/skills</span><span class="cmd-desc">List / create / search skills</span></div>
+        <div class="cmd-row"><span class="cmd-name">/sessions [name]</span><span class="cmd-desc">Switch session</span></div>
+        <div class="cmd-row"><span class="cmd-name">/new [name]</span><span class="cmd-desc">Create new session</span></div>
+        <div class="cmd-row"><span class="cmd-name">/reset</span><span class="cmd-desc">Clear current session</span></div>
+        <div class="cmd-row"><span class="cmd-name">/export [path]</span><span class="cmd-desc">Export chat to markdown</span></div>
+        <div class="cmd-row"><span class="cmd-name">/compact</span><span class="cmd-desc">Compress message history</span></div>
+        <div class="cmd-row"><span class="cmd-name">/cost</span><span class="cmd-desc">Usage and cost stats</span></div>
+        <div class="cmd-row"><span class="cmd-name">/tokens</span><span class="cmd-desc">Detailed per-model breakdown</span></div>
+        <div class="cmd-row"><span class="cmd-name">/tools</span><span class="cmd-desc">List available tools</span></div>
+        <div class="cmd-row"><span class="cmd-name">/exit</span><span class="cmd-desc">Exit</span></div>
+    </div>
+</section>
+
+<!-- Divider -->
+<div class="divider"><div class="divider-line"></div></div>
+
+<!-- Config -->
+<section class="section config-section">
+    <div class="section-header reveal">
+        <div class="section-label">Configuration</div>
+        <h2 class="section-title">Config structure</h2>
+    </div>
+    <div class="config-tree reveal reveal-delay-1">
+        <span class="folder">~/.klyxor/</span><br>
+        <span class="branch">+-- </span><span class="file">config.json</span><span class="comment"># Providers, models, API keys</span><br>
+        <span class="branch">+-- </span><span class="file">sessions.json</span><span class="comment"># Session history</span><br>
+        <span class="branch">+-- </span><span class="folder">skills/</span><span class="comment"># Custom skills (.md)</span><br>
+        <span class="branch">\-- </span><span class="folder">exports/</span><span class="comment"># Exported chats</span>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer>
+    <div class="footer-inner">
+        <div class="footer-left">
+            <span class="footer-logo">kly<span class="accent">xor</span></span>
+            <div class="footer-links">
+                <a href="https://github.com/alnyx/klyxor">GitHub</a>
+                <a href="https://www.npmjs.com/package/@alnyx/klyxor">npm</a>
+            </div>
+        </div>
+        <div class="footer-right">MIT License</div>
+    </div>
+</footer>
+
+<script>
+    function copyInstall() {
+        const btn = document.getElementById('copyBtn');
+        navigator.clipboard.writeText('npm install -g @alnyx/klyxor').then(() => {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+                btn.classList.remove('copied');
+            }, 2000);
+        });
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { rootMargin: '0px 0px -40px 0px', threshold: 0.1 });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
