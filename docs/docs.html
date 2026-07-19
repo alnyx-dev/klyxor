@@ -1,0 +1,1638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klyxor — Documentation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #09090b;
+            --surface: #18181b;
+            --surface-hover: #27272a;
+            --border: #27272a;
+            --border-subtle: #1e1e22;
+            --text: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #52525b;
+            --accent: #51ff48;
+            --accent-dim: rgba(81, 255, 72, 0.08);
+            --accent-border: rgba(81, 255, 72, 0.15);
+            --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            --sidebar-width: 260px;
+            --header-height: 60px;
+        }
+
+        html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.65;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ============================================
+           HEADER
+           ============================================ */
+        .site-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: rgba(9, 9, 11, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .header-inner {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-logo {
+            font-family: var(--mono);
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--text);
+            text-decoration: none;
+            letter-spacing: -1px;
+        }
+
+        .header-logo .accent { color: var(--accent); }
+
+        .header-nav {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .header-nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            transition: color 0.15s, background 0.15s;
+        }
+
+        .header-nav a:hover,
+        .header-nav a.active {
+            color: var(--text);
+            background: var(--surface);
+        }
+
+        .hamburger {
+            display: none;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.4rem 0.55rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .hamburger svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--text);
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        /* ============================================
+           SIDEBAR
+           ============================================ */
+        .sidebar {
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            width: var(--sidebar-width);
+            height: calc(100vh - var(--header-height));
+            background: var(--bg);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 1.5rem 0;
+            z-index: 90;
+        }
+
+        .sidebar::-webkit-scrollbar { width: 3px; }
+        .sidebar::-webkit-scrollbar-track { background: transparent; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        .sidebar-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .sidebar-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-muted);
+            padding: 0 1.5rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .sidebar-link {
+            display: block;
+            padding: 0.35rem 1.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            transition: color 0.15s, background 0.15s, border-color 0.15s;
+            border-left: 2px solid transparent;
+        }
+
+        .sidebar-link:hover {
+            color: var(--text);
+            background: var(--accent-dim);
+        }
+
+        .sidebar-link.active {
+            color: var(--accent);
+            background: var(--accent-dim);
+            border-left-color: var(--accent);
+        }
+
+        /* ============================================
+           MAIN CONTENT
+           ============================================ */
+        .main {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--header-height);
+            min-height: calc(100vh - var(--header-height));
+            padding: 3rem 4rem 6rem;
+            max-width: 900px;
+        }
+
+        .doc-section {
+            margin-bottom: 4rem;
+        }
+
+        .doc-section:last-child {
+            margin-bottom: 2rem;
+        }
+
+        /* ============================================
+           TYPOGRAPHY
+           ============================================ */
+        h1 {
+            font-size: clamp(2rem, 4vw, 2.75rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1.1;
+            margin-bottom: 1rem;
+        }
+
+        h2 {
+            font-size: clamp(1.4rem, 2.5vw, 1.75rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            padding-top: 1rem;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.6rem;
+            color: var(--text);
+        }
+
+        p {
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+            line-height: 1.7;
+            margin-bottom: 1rem;
+        }
+
+        p strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .subtitle {
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            max-width: 560px;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 3rem 0;
+        }
+
+        /* ============================================
+           CODE
+           ============================================ */
+        code {
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            color: var(--accent);
+        }
+
+        .code-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .code-block-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border-subtle);
+            background: rgba(24, 24, 27, 0.5);
+        }
+
+        .code-block-lang {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .copy-btn {
+            background: var(--accent-dim);
+            border: 1px solid var(--accent-border);
+            color: var(--accent);
+            padding: 0.25rem 0.6rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: var(--sans);
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            transition: all 0.15s;
+            text-transform: uppercase;
+        }
+
+        .copy-btn:hover {
+            background: rgba(81, 255, 72, 0.15);
+        }
+
+        .copy-btn.copied {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+        }
+
+        .code-block-body {
+            padding: 1.25rem 1.5rem;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            line-height: 1.9;
+            overflow-x: auto;
+        }
+
+        .code-block-body .comment { color: var(--text-muted); }
+        .code-block-body .prompt { color: var(--accent); user-select: none; }
+        .code-block-body .cmd { color: var(--text); }
+        .code-block-body .flag { color: #818cf8; }
+        .code-block-body .string { color: #fbbf24; }
+        .code-block-body .key { color: #818cf8; }
+        .code-block-body .value { color: #34d399; }
+        .code-block-body .bracket { color: var(--text-muted); }
+        .code-block-body .prop { color: var(--text); }
+        .code-block-body .bool { color: #f472b6; }
+
+        /* ============================================
+           TABLES
+           ============================================ */
+        .table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        thead {
+            background: var(--surface);
+        }
+
+        th {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            color: var(--text);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 0.65rem 1rem;
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        tbody tr:hover {
+            background: rgba(81, 255, 72, 0.02);
+        }
+
+        td code {
+            font-size: 0.78rem;
+        }
+
+        /* ============================================
+           LISTS
+           ============================================ */
+        ul, ol {
+            padding-left: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        li {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.7;
+            margin-bottom: 0.3rem;
+        }
+
+        li strong { color: var(--text); }
+
+        /* ============================================
+           CALLOUTS
+           ============================================ */
+        .callout {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .callout-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--accent);
+            margin-bottom: 0.4rem;
+        }
+
+        .callout p {
+            font-size: 0.85rem;
+            margin-bottom: 0;
+        }
+
+        /* ============================================
+           FEATURE GRID (Overview)
+           ============================================ */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem 1.15rem;
+            transition: border-color 0.2s;
+        }
+
+        .feature-item:hover {
+            border-color: var(--surface-hover);
+        }
+
+        .feature-item-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.2rem;
+        }
+
+        .feature-item-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* ============================================
+           TOOL CARD
+           ============================================ */
+        .tool-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .tool-card-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .tool-name {
+            font-family: var(--mono);
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .tool-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border: 1px solid var(--accent-border);
+        }
+
+        .tool-badge.mode-plan {
+            background: rgba(129, 140, 248, 0.08);
+            color: #818cf8;
+            border-color: rgba(129, 140, 248, 0.15);
+        }
+
+        .tool-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .tool-params {
+            font-size: 0.8rem;
+        }
+
+        .tool-params dt {
+            font-family: var(--mono);
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.15rem;
+        }
+
+        .tool-params dd {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            padding-left: 0.75rem;
+        }
+
+        /* ============================================
+           FOOTER
+           ============================================ */
+        .site-footer {
+            margin-left: var(--sidebar-width);
+            padding: 2.5rem 4rem 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .footer-logo {
+            font-family: var(--mono);
+            font-weight: 800;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+
+        .footer-logo .accent { color: var(--accent); }
+
+        .footer-links {
+            display: flex;
+            gap: 1.25rem;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.15s;
+        }
+
+        .footer-links a:hover { color: var(--text); }
+
+        .footer-right {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ============================================
+           MOBILE OVERLAY
+           ============================================ */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 85;
+        }
+
+        .sidebar-overlay.visible {
+            display: block;
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 900px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+                z-index: 95;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main {
+                margin-left: 0;
+                padding: 2rem 1.5rem 4rem;
+            }
+
+            .site-footer {
+                margin-left: 0;
+                padding: 2rem 1.5rem 1.5rem;
+            }
+
+            .hamburger {
+                display: flex;
+            }
+
+            .header-nav {
+                display: none;
+            }
+
+            .header-nav.open {
+                display: flex;
+                flex-direction: column;
+                position: absolute;
+                top: var(--header-height);
+                right: 1rem;
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 0.5rem;
+                min-width: 160px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .footer-left {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main {
+                padding: 1.5rem 1rem 3rem;
+            }
+
+            h1 { font-size: 1.75rem; }
+            h2 { font-size: 1.3rem; }
+
+            .tool-card {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="site-header">
+    <div class="header-inner">
+        <a href="index.html" class="header-logo">kly<span class="accent">xor</span></a>
+        <nav class="header-nav" id="headerNav">
+            <a href="#overview" class="active">Overview</a>
+            <a href="#installation">Installation</a>
+            <a href="#configuration">Configuration</a>
+            <a href="#commands">Commands</a>
+            <a href="#tools">Tools</a>
+            <a href="#skills">Skills</a>
+            <a href="#api">API</a>
+        </nav>
+        <button class="hamburger" id="hamburgerBtn" aria-label="Toggle navigation">
+            <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+    </div>
+</header>
+
+<!-- Sidebar overlay (mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-group">
+        <div class="sidebar-label">Getting Started</div>
+        <a href="#overview" class="sidebar-link active">Overview</a>
+        <a href="#installation" class="sidebar-link">Installation</a>
+        <a href="#quick-start" class="sidebar-link">Quick Start</a>
+    </div>
+    <div class="sidebar-group">
+        <div class="sidebar-label">Setup</div>
+        <a href="#configuration" class="sidebar-link">Configuration</a>
+        <a href="#environment-variables" class="sidebar-link">Environment Variables</a>
+        <a href="#project-context" class="sidebar-link">Project Context</a>
+    </div>
+    <div class="sidebar-group">
+        <div class="sidebar-label">Usage</div>
+        <a href="#commands" class="sidebar-link">Slash Commands</a>
+        <a href="#modes" class="sidebar-link">Modes</a>
+        <a href="#tools" class="sidebar-link">Tools Reference</a>
+        <a href="#skills" class="sidebar-link">Skills System</a>
+    </div>
+    <div class="sidebar-group">
+        <div class="sidebar-label">Advanced</div>
+        <a href="#sessions" class="sidebar-link">Session Management</a>
+        <a href="#compaction" class="sidebar-link">Context Compaction</a>
+        <a href="#token-tracking" class="sidebar-link">Token & Cost Tracking</a>
+        <a href="#troubleshooting" class="sidebar-link">Troubleshooting</a>
+    </div>
+    <div class="sidebar-group">
+        <div class="sidebar-label">Reference</div>
+        <a href="#api" class="sidebar-link">API Reference</a>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="main">
+
+    <!-- ======================== OVERVIEW ======================== -->
+    <section class="doc-section" id="overview">
+        <h1>Documentation</h1>
+        <p class="subtitle">
+            Everything you need to install, configure, and use Klyxor effectively.
+        </p>
+
+        <h2>What is Klyxor?</h2>
+        <p>
+            Klyxor is an AI coding agent that runs in your terminal. It connects to any OpenAI-compatible LLM provider, reads and writes files, executes shell commands, and delegates tasks to subagents. Think of it as a coding assistant that lives where you work.
+        </p>
+
+        <p>
+            It comes with two distinct modes: <strong>Plan</strong> (read-only analysis) and <strong>Build</strong> (full code access). You can switch between them on the fly, manage multiple sessions, and extend its capabilities through a markdown-based skills system.
+        </p>
+
+        <h3>Key Features</h3>
+        <div class="feature-grid">
+            <div class="feature-item">
+                <div class="feature-item-name">Plan / Build Modes</div>
+                <div class="feature-item-desc">Read-only planning or full-access execution. Switch anytime.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Subagent Delegation</div>
+                <div class="feature-item-desc">Spawn nested subagents for parallel tasks (max depth 2).</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Multi-Provider LLM</div>
+                <div class="feature-item-desc">Connect multiple providers, each with multiple models.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Skills System</div>
+                <div class="feature-item-desc">Markdown skills with triggers, dependencies, and auto-matching.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Todo Lists</div>
+                <div class="feature-item-desc">Agent tracks tasks inside sessions. All changes visible in chat.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Token & Cost Tracking</div>
+                <div class="feature-item-desc">Per-model usage stats with estimated costs.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Project Context</div>
+                <div class="feature-item-desc">Auto-loads AGENTS.md, KLYXOR.md, .klyxor/context.md.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Session Persistence</div>
+                <div class="feature-item-desc">Conversation history saved and resumable across sessions.</div>
+            </div>
+        </div>
+
+        <h3>Requirements</h3>
+        <ul>
+            <li><strong>Node.js 18+</strong> (19, 20, 22 all work)</li>
+            <li>A terminal (macOS, Linux, Windows)</li>
+            <li>At least one LLM provider API key</li>
+        </ul>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== INSTALLATION ======================== -->
+    <section class="doc-section" id="installation">
+        <h2>Installation</h2>
+        <p>Install Klyxor globally via npm:</p>
+
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">bash</span>
+                <button class="copy-btn" data-copy="npm install -g @alnyx/klyxor">Copy</button>
+            </div>
+            <div class="code-block-body">
+                <span class="prompt">$</span> <span class="cmd">npm install -g @alnyx/klyxor</span>
+            </div>
+        </div>
+
+        <p>Verify the installation:</p>
+
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">bash</span>
+                <button class="copy-btn" data-copy="klyxor --help">Copy</button>
+            </div>
+            <div class="code-block-body">
+                <span class="prompt">$</span> <span class="cmd">klyxor --help</span>
+            </div>
+        </div>
+
+        <div class="callout">
+            <div class="callout-title">Note</div>
+            <p>On first launch, Klyxor creates <code>~/.klyxor/</code> in your home directory with default config, sessions storage, and skills folder.</p>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== QUICK START ======================== -->
+    <section class="doc-section" id="quick-start">
+        <h2>Quick Start</h2>
+        <p>Run a one-shot query without entering interactive mode:</p>
+
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">bash</span>
+                <button class="copy-btn" data-copy='klyxor "Write a hello world in Python"'>Copy</button>
+            </div>
+            <div class="code-block-body">
+                <span class="comment"># One-shot query</span><br>
+                <span class="prompt">$</span> <span class="cmd">klyxor <span class="string">"Write a hello world in Python"</span></span>
+            </div>
+        </div>
+
+        <p>Start in Plan mode for read-only analysis:</p>
+
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">bash</span>
+                <button class="copy-btn" data-copy='klyxor --plan "Design a REST API"'>Copy</button>
+            </div>
+            <div class="code-block-body">
+                <span class="comment"># Plan mode</span><br>
+                <span class="prompt">$</span> <span class="cmd">klyxor <span class="flag">--plan</span> <span class="string">"Design a REST API"</span></span>
+            </div>
+        </div>
+
+        <p>Launch interactive mode:</p>
+
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">bash</span>
+                <button class="copy-btn" data-copy="klyxor">Copy</button>
+            </div>
+            <div class="code-block-body">
+                <span class="comment"># Interactive mode</span><br>
+                <span class="prompt">$</span> <span class="cmd">klyxor</span>
+            </div>
+        </div>
+
+        <p>Set up a provider from the interactive prompt:</p>
+
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">bash</span>
+                <button class="copy-btn" data-copy='export OPENAI_API_KEY=sk-your-key-here'>Copy</button>
+            </div>
+            <div class="code-block-body">
+                <span class="comment"># Set your API key</span><br>
+                <span class="prompt">$</span> <span class="cmd">export OPENAI_API_KEY=sk-your-key-here</span><br><br>
+                <span class="comment"># Or connect via slash command</span><br>
+                <span class="cmd">></span> <span class="flag">/connect openai</span><br>
+                <span class="cmd">></span> <span class="flag">/model gpt-4o</span>
+            </div>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== CONFIGURATION ======================== -->
+    <section class="doc-section" id="configuration">
+        <h2>Configuration</h2>
+        <p>All configuration lives in <code>~/.klyxor/</code>:</p>
+
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">text</span>
+            </div>
+            <div class="code-block-body">
+<span class="folder">~/.klyxor/</span>
+├── <span class="prop">config.json</span>       <span class="comment"># Providers, models, API keys</span>
+├── <span class="prop">sessions.json</span>     <span class="comment"># Chat session history</span>
+├── <span class="folder">skills/</span>           <span class="comment"># Custom skill files (.md)</span>
+└── <span class="folder">exports/</span>          <span class="comment"># Exported session transcripts</span>
+            </div>
+        </div>
+
+        <h3>config.json</h3>
+        <p>The main configuration file. Providers, models, and API keys all live here:</p>
+
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">json</span>
+                <button class="copy-btn" data-copy='{
+  "providers": {
+    "openai": {
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "${OPENAI_API_KEY}",
+      "models": ["gpt-4o", "gpt-4o-mini"],
+      "active_model": "gpt-4o"
+    }
+  },
+  "active_provider": "openai"
+}'>Copy</button>
+            </div>
+            <div class="code-block-body">
+<span class="bracket">{</span>
+  <span class="key">"providers"</span><span class="bracket">:</span> <span class="bracket">{</span>
+    <span class="key">"openai"</span><span class="bracket">:</span> <span class="bracket">{</span>
+      <span class="key">"base_url"</span><span class="bracket">:</span> <span class="string">"https://api.openai.com/v1"</span><span class="bracket">,</span>
+      <span class="key">"api_key"</span><span class="bracket">:</span> <span class="string">"${OPENAI_API_KEY}"</span><span class="bracket">,</span>
+      <span class="key">"models"</span><span class="bracket">:</span> <span class="bracket">[</span><span class="string">"gpt-4o"</span><span class="bracket">,</span> <span class="string">"gpt-4o-mini"</span><span class="bracket">]</span><span class="bracket">,</span>
+      <span class="key">"active_model"</span><span class="bracket">:</span> <span class="string">"gpt-4o"</span>
+    <span class="bracket">}</span>
+  <span class="bracket">}</span><span class="bracket">,</span>
+  <span class="key">"active_provider"</span><span class="bracket">:</span> <span class="string">"openai"</span>
+<span class="bracket">}</span>
+            </div>
+        </div>
+
+        <h3>Environment Variable Expansion</h3>
+        <p>API keys support two syntaxes for referencing environment variables:</p>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Syntax</th><th>Example</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>${VAR_NAME}</code></td><td><code>"${OPENAI_API_KEY}"</code></td></tr>
+                    <tr><td><code>env:VAR_NAME</code></td><td><code>"env:OPENAI_API_KEY"</code></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>Both syntaxes resolve the environment variable at runtime. The key value is never stored in plain text.</p>
+
+        <h3>Fallback API Key</h3>
+        <p>If a provider's <code>api_key</code> field is empty or missing, Klyxor checks for a <code>KLYXOR_API_KEY</code> environment variable as a universal fallback. This works across all providers.</p>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== ENVIRONMENT VARIABLES ======================== -->
+    <section class="doc-section" id="environment-variables">
+        <h2>Environment Variables</h2>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Variable</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>KLYXOR_API_KEY</code></td>
+                        <td>Fallback API key for any provider. Used when a provider's api_key is empty.</td>
+                    </tr>
+                    <tr>
+                        <td><code>OPENAI_API_KEY</code></td>
+                        <td>OpenAI API key. Referenced via <code>${OPENAI_API_KEY}</code> in config.</td>
+                    </tr>
+                    <tr>
+                        <td><code>ANTHROPIC_API_KEY</code></td>
+                        <td>Anthropic API key. Referenced via <code>${ANTHROPIC_API_KEY}</code> in config.</td>
+                    </tr>
+                    <tr>
+                        <td>Any <code>*_API_KEY</code></td>
+                        <td>Can be referenced in config.json via <code>${VAR_NAME}</code> or <code>env:VAR_NAME</code>.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== PROJECT CONTEXT ======================== -->
+    <section class="doc-section" id="project-context">
+        <h2>Project Context</h2>
+        <p>Klyxor auto-loads specific files from your project root into the system prompt. This gives the agent awareness of your project's conventions, architecture, and constraints without you having to explain them every session.</p>
+
+        <h3>Auto-loaded Files</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>File</th><th>Purpose</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>AGENTS.md</code></td>
+                        <td>Standard agent instructions (shared with other AI tools)</td>
+                    </tr>
+                    <tr>
+                        <td><code>KLYXOR.md</code></td>
+                        <td>Klyxor-specific project instructions</td>
+                    </tr>
+                    <tr>
+                        <td><code>.klyxor/context.md</code></td>
+                        <td>Additional context (architecture notes, constraints, etc.)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>Place any of these in your project root. They're loaded automatically on startup and included in every LLM call.</p>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== COMMANDS ======================== -->
+    <section class="doc-section" id="commands">
+        <h2>Slash Commands</h2>
+        <p>Type these in the interactive prompt. All commands start with <code>/</code>.</p>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Command</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>/help</code></td><td>List all available commands</td></tr>
+                    <tr><td><code>/plan</code></td><td>Switch to Plan mode (read-only)</td></tr>
+                    <tr><td><code>/build</code></td><td>Switch to Build mode (full access)</td></tr>
+                    <tr><td><code>/model [name]</code></td><td>Show current model or switch to a new one</td></tr>
+                    <tr><td><code>/connect [name]</code></td><td>Connect a provider (format: <code>provider/model</code>)</td></tr>
+                    <tr><td><code>/skills</code></td><td>List available skills</td></tr>
+                    <tr><td><code>/skills create &lt;name&gt;</code></td><td>Create a new skill</td></tr>
+                    <tr><td><code>/skills info &lt;name&gt;</code></td><td>Show skill details and metadata</td></tr>
+                    <tr><td><code>/skills find &lt;query&gt;</code></td><td>Find skills matching a file or task description</td></tr>
+                    <tr><td><code>/sessions [name]</code></td><td>List sessions or switch to a specific one</td></tr>
+                    <tr><td><code>/new [name]</code></td><td>Create and switch to a new session</td></tr>
+                    <tr><td><code>/reset</code></td><td>Clear current session history</td></tr>
+                    <tr><td><code>/export [path]</code></td><td>Export chat transcript to a markdown file</td></tr>
+                    <tr><td><code>/compact</code></td><td>Manually compress conversation history</td></tr>
+                    <tr><td><code>/cost</code></td><td>Show total usage and estimated cost</td></tr>
+                    <tr><td><code>/tokens</code></td><td>Detailed per-model token breakdown</td></tr>
+                    <tr><td><code>/tools</code></td><td>List all tools available in current mode</td></tr>
+                    <tr><td><code>/exit</code></td><td>Save and exit Klyxor</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== MODES ======================== -->
+    <section class="doc-section" id="modes">
+        <h2>Modes</h2>
+        <p>Klyxor has two operating modes. You can switch between them at any time with <code>/plan</code> or <code>/build</code>.</p>
+
+        <h3>Plan Mode</h3>
+        <p>Read-only analysis. The agent can read files, search code, grep, and fetch web pages, but cannot write, edit, or execute commands. Use this for code review, architecture planning, and understanding unfamiliar codebases.</p>
+
+        <ul>
+            <li><code>read_file</code> - Read file contents</li>
+            <li><code>list_files</code> - Browse directories</li>
+            <li><code>grep</code> - Search file contents</li>
+            <li><code>git_status</code> / <code>git_diff</code> - View repo state</li>
+            <li><code>web_fetch</code> - Fetch web pages</li>
+            <li><code>delegate</code> - Spawn plan-only subagents</li>
+            <li><code>todo_list</code> - Track tasks (read-only)</li>
+        </ul>
+
+        <h3>Build Mode</h3>
+        <p>Full access. The agent can read, write, edit files, run shell commands, and delegate tasks. Use this when you're ready to implement changes.</p>
+
+        <ul>
+            <li>Everything in Plan mode, plus:</li>
+            <li><code>write_file</code> - Create or overwrite files</li>
+            <li><code>edit_file</code> - Edit files with exact string replacement</li>
+            <li><code>bash</code> - Execute shell commands</li>
+            <li><code>delegate</code> - Spawn build-capable subagents</li>
+        </ul>
+
+        <div class="callout">
+            <div class="callout-title">Tip</div>
+            <p>Start in Plan mode to analyze what needs changing, then switch to Build mode when you're ready to write code. The agent keeps context across mode switches.</p>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== TOOLS ======================== -->
+    <section class="doc-section" id="tools">
+        <h2>Tools Reference</h2>
+        <p>These are the tools available to the agent. Tool availability depends on the current mode.</p>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">bash</span>
+                <span class="tool-badge mode-plan">Build only</span>
+            </div>
+            <p class="tool-desc">Execute shell commands. Destructive commands (rm, mv, etc.) are blocked in Plan mode.</p>
+            <dl class="tool-params">
+                <dt>command</dt>
+                <dd><code>string</code> - The shell command to execute</dd>
+                <dt>Timeout</dt>
+                <dd>120 seconds. Commands that exceed this are killed.</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">read_file</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Read file contents with optional line range.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - Absolute or relative file path</dd>
+                <dt>offset</dt>
+                <dd><code>number</code> - Line number to start from (optional, 1-indexed)</dd>
+                <dt>limit</dt>
+                <dd><code>number</code> - Max lines to return (optional, default: 2000)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">write_file</span>
+                <span class="tool-badge mode-plan">Build only</span>
+            </div>
+            <p class="tool-desc">Create or overwrite a file. Parent directories are created automatically.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - Absolute or relative file path</dd>
+                <dt>content</dt>
+                <dd><code>string</code> - Full file content to write</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">edit_file</span>
+                <span class="tool-badge mode-plan">Build only</span>
+            </div>
+            <p class="tool-desc">Edit files with exact string replacement. Fails if <code>old_text</code> is found zero times or more than once. Provide enough surrounding context to make the match unique.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - File to edit</dd>
+                <dt>old_text</dt>
+                <dd><code>string</code> - Exact text to find and replace</dd>
+                <dt>new_text</dt>
+                <dd><code>string</code> - Replacement text</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">list_files</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">List directory contents. Supports glob patterns. Skips .git, node_modules, __pycache__, .klyxor.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - Directory path (optional, defaults to current dir)</dd>
+                <dt>pattern</dt>
+                <dd><code>string</code> - Glob pattern: <code>*</code>, <code>**/*</code>, <code>**/*.ts</code>, etc.</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">grep</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Search file contents using regex. Returns file:line:content matches.</p>
+            <dl class="tool-params">
+                <dt>pattern</dt>
+                <dd><code>string</code> - Regular expression pattern</dd>
+                <dt>path</dt>
+                <dd><code>string</code> - Directory to search in (optional)</dd>
+                <dt>include</dt>
+                <dd><code>string</code> - File pattern filter (e.g. <code>*.ts</code>)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">delegate</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Delegate a task to a subagent. Subagents can run in plan or build mode independently. Maximum nesting depth: 2 levels.</p>
+            <dl class="tool-params">
+                <dt>task</dt>
+                <dd><code>string</code> - Description of what the subagent should do</dd>
+                <dt>mode</dt>
+                <dd><code>string</code> - <code>"plan"</code> or <code>"build"</code> (optional, defaults to current mode)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">git_status</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Show git status for the current repository. Runs <code>git status --short --branch</code>.</p>
+            <dl class="tool-params">
+                <dt>No parameters</dt>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">git_diff</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Show git diff for the repository or a specific path.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - Specific file or directory (optional)</dd>
+                <dt>staged</dt>
+                <dd><code>boolean</code> - Show staged changes if true (optional)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">web_fetch</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Fetch a web page and extract its text content. HTML is stripped. Max 8000 characters returned.</p>
+            <dl class="tool-params">
+                <dt>url</dt>
+                <dd><code>string</code> - URL to fetch</dd>
+                <dt>Timeout</dt>
+                <dd>20 seconds</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">todo_list</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Manage a task list within the session. The full list is shown after every action.</p>
+            <dl class="tool-params">
+                <dt>action</dt>
+                <dd><code>string</code> - One of: <code>"add"</code>, <code>"update"</code>, <code>"delete"</code>, <code>"list"</code></dd>
+                <dt>text</dt>
+                <dd><code>string</code> - Task description (for add)</dd>
+                <dt>id</dt>
+                <dd><code>number</code> - Task ID (for update/delete)</dd>
+                <dt>status</dt>
+                <dd><code>string</code> - <code>"pending"</code>, <code>"in_progress"</code>, or <code>"completed"</code> (for update)</dd>
+            </dl>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== SKILLS ======================== -->
+    <section class="doc-section" id="skills">
+        <h2>Skills System</h2>
+        <p>Skills are markdown files in <code>~/.klyxor/skills/</code> that extend the agent's behavior. They load on demand, matched by file extension, task keywords, or explicit triggers.</p>
+
+        <h3>Skill File Format</h3>
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">markdown</span>
+                <button class="copy-btn" data-copy='---
+name: typescript-refactor
+description: Best practices for refactoring TypeScript codebases
+triggers:
+  - refactor
+  - cleanup
+  - typescript
+tags:
+  - typescript
+  - refactoring
+version: 1.0.0
+requires:
+  - typescript-basics
+---
+
+# TypeScript Refactoring
+
+When refactoring TypeScript code, follow these guidelines...'>Copy</button>
+            </div>
+            <div class="code-block-body">
+<span class="key">---</span>
+<span class="prop">name</span><span class="bracket">:</span> <span class="string">typescript-refactor</span>
+<span class="prop">description</span><span class="bracket">:</span> <span class="string">Best practices for refactoring TypeScript codebases</span>
+<span class="prop">triggers</span><span class="bracket">:</span>
+  <span class="bracket">-</span> <span class="string">refactor</span>
+  <span class="bracket">-</span> <span class="string">cleanup</span>
+  <span class="bracket">-</span> <span class="string">typescript</span>
+<span class="prop">tags</span><span class="bracket">:</span>
+  <span class="bracket">-</span> <span class="string">typescript</span>
+  <span class="bracket">-</span> <span class="string">refactoring</span>
+<span class="prop">version</span><span class="bracket">:</span> <span class="string">1.0.0</span>
+<span class="prop">requires</span><span class="bracket">:</span>
+  <span class="bracket">-</span> <span class="string">typescript-basics</span>
+<span class="key">---</span>
+
+<span class="comment"># TypeScript Refactoring</span>
+
+When refactoring TypeScript code, follow these guidelines...
+            </div>
+        </div>
+
+        <h3>Frontmatter Fields</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>name</code></td><td>string</td><td>Unique skill identifier</td></tr>
+                    <tr><td><code>description</code></td><td>string</td><td>What this skill does</td></tr>
+                    <tr><td><code>triggers</code></td><td>string[]</td><td>Keywords that activate this skill</td></tr>
+                    <tr><td><code>tags</code></td><td>string[]</td><td>Categorization tags</td></tr>
+                    <tr><td><code>version</code></td><td>string</td><td>Semver version</td></tr>
+                    <tr><td><code>requires</code></td><td>string[]</td><td>Other skills this one depends on</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Auto-matching</h3>
+        <p>Skills are automatically matched based on:</p>
+        <ul>
+            <li><strong>File extension</strong> - Skills tagged with <code>*.ts</code> load when editing TypeScript files</li>
+            <li><strong>Task keywords</strong> - The agent checks your message against trigger keywords</li>
+            <li><strong>Explicit use</strong> - The agent can load skills via the <code>list_skills</code>, <code>read_skill</code>, or <code>find_skills</code> tools</li>
+        </ul>
+
+        <h3>Dependencies</h3>
+        <p>Skills can declare dependencies via the <code>requires</code> field. When a skill is loaded, its dependencies are loaded first. This lets you compose complex behaviors from smaller building blocks.</p>
+
+        <h3>Managing Skills</h3>
+        <p>From the interactive prompt:</p>
+        <ul>
+            <li><code>/skills</code> - List all installed skills</li>
+            <li><code>/skills create &lt;name&gt;</code> - Create a new skill file with template frontmatter</li>
+            <li><code>/skills info &lt;name&gt;</code> - Show full details for a skill</li>
+            <li><code>/skills find &lt;query&gt;</code> - Search skills by keyword or file type</li>
+        </ul>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== SESSIONS ======================== -->
+    <section class="doc-section" id="sessions">
+        <h2>Session Management</h2>
+        <p>Sessions persist your conversation history across restarts. Each session tracks its own mode (plan/build), message history, and todo list.</p>
+
+        <h3>Creating Sessions</h3>
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">text</span>
+            </div>
+            <div class="code-block-body">
+<span class="comment"># Create a named session</span>
+<span class="cmd">></span> <span class="flag">/new auth-refactor</span>
+
+<span class="comment"># Create an auto-named session</span>
+<span class="cmd">></span> <span class="flag">/new</span>
+<span class="comment"># → Creates "session-3" (increments automatically)</span>
+            </div>
+        </div>
+
+        <h3>Switching Sessions</h3>
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">text</span>
+            </div>
+            <div class="code-block-body">
+<span class="comment"># List all sessions</span>
+<span class="cmd">></span> <span class="flag">/sessions</span>
+
+<span class="comment"># Switch to a specific session</span>
+<span class="cmd">></span> <span class="flag">/sessions auth-refactor</span>
+            </div>
+        </div>
+
+        <h3>Session Storage</h3>
+        <p>All sessions are saved to <code>~/.klyxor/sessions.json</code>. This includes message history, active mode, and todo state. Sessions are loaded on startup and saved after each interaction.</p>
+
+        <h3>Resetting a Session</h3>
+        <p><code>/reset</code> clears the current session's message history but keeps the session itself. Use this when you want a fresh context without creating a new session.</p>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== COMPACTION ======================== -->
+    <section class="doc-section" id="compaction">
+        <h2>Context Compaction</h2>
+        <p>Long conversations consume tokens fast. Klyxor handles this with automatic context compaction.</p>
+
+        <h3>How It Works</h3>
+        <ul>
+            <li>When messages exceed <strong>60 messages</strong>, compaction triggers automatically</li>
+            <li>The system keeps the <strong>system prompt</strong>, a <strong>generated summary</strong>, and the <strong>last 20 messages</strong></li>
+            <li>Older messages are summarized by the LLM into a compact context block</li>
+        </ul>
+
+        <h3>Manual Trigger</h3>
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">text</span>
+                <button class="copy-btn" data-copy="/compact">Copy</button>
+            </div>
+            <div class="code-block-body">
+<span class="cmd">></span> <span class="flag">/compact</span>
+            </div>
+        </div>
+
+        <p>Run <code>/compact</code> manually when you want to free up context space before starting a new task. The agent keeps the important parts and discards the rest.</p>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== TOKEN TRACKING ======================== -->
+    <section class="doc-section" id="token-tracking">
+        <h2>Token & Cost Tracking</h2>
+        <p>Klyxor tracks token usage per model with estimated costs. This helps you stay aware of spending.</p>
+
+        <h3>/cost</h3>
+        <p>Shows total calls, tokens, and estimated cost across all models used in the session.</p>
+
+        <h3>/tokens</h3>
+        <p>Detailed per-model breakdown showing input tokens, output tokens, and cost for each model that was called.</p>
+
+        <div class="callout">
+            <div class="callout-title">Note</div>
+            <p>Costs are estimated using built-in pricing tables. Actual charges may vary by provider and plan. Check your provider's dashboard for exact billing.</p>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== TROUBLESHOOTING ======================== -->
+    <section class="doc-section" id="troubleshooting">
+        <h2>Troubleshooting</h2>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">"Provider not configured"</span>
+            </div>
+            <p class="tool-desc">No active provider is set. Run <code>/connect</code> to list and select a provider, or add one through the config file.</p>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">"API key not set"</span>
+            </div>
+            <p class="tool-desc">The provider's API key is missing. Set the environment variable (e.g. <code>export OPENAI_API_KEY=sk-...</code>) or update <code>config.json</code> with the <code>${ENV_VAR}</code> syntax.</p>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">"LLM call failed"</span>
+            </div>
+            <p class="tool-desc">Check your network connection, API key validity, and model availability. Klyxor retries on transient failures (408, 429, 5xx) with exponential backoff. If it keeps failing, try a different model or provider.</p>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">Context too long / slow responses</span>
+            </div>
+            <p class="tool-desc">Your conversation has grown large. Run <code>/compact</code> to summarize old messages and free up context space. You can also <code>/reset</code> to start fresh.</p>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">"Command not found: klyxor"</span>
+            </div>
+            <p class="tool-desc">Klyxor isn't in your PATH. Run <code>npm install -g @alnyx/klyxor</code> again. On some systems, you may need to use <code>sudo</code> or configure npm's global prefix.</p>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== API ======================== -->
+    <section class="doc-section" id="api">
+        <h2>API Reference</h2>
+        <p>Klyxor connects to any <strong>OpenAI-compatible API</strong>. This means you can use it with OpenAI, Anthropic (via compatible endpoints), local models (Ollama, vLLM), or any provider that implements the OpenAI chat completions format.</p>
+
+        <h3>Provider Configuration</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>base_url</code></td><td>string</td><td>API endpoint URL (must be OpenAI-compatible)</td></tr>
+                    <tr><td><code>api_key</code></td><td>string</td><td>Authentication key (supports env var expansion)</td></tr>
+                    <tr><td><code>models</code></td><td>string[]</td><td>List of available model IDs</td></tr>
+                    <tr><td><code>active_model</code></td><td>string</td><td>Currently selected model from the list</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Example: Adding a Local Provider</h3>
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">json</span>
+                <button class="copy-btn" data-copy='{
+  "providers": {
+    "ollama": {
+      "base_url": "http://localhost:11434/v1",
+      "api_key": "ollama",
+      "models": ["llama3", "codellama", "mistral"],
+      "active_model": "codellama"
+    }
+  },
+  "active_provider": "ollama"
+}'>Copy</button>
+            </div>
+            <div class="code-block-body">
+<span class="bracket">{</span>
+  <span class="key">"providers"</span><span class="bracket">:</span> <span class="bracket">{</span>
+    <span class="key">"ollama"</span><span class="bracket">:</span> <span class="bracket">{</span>
+      <span class="key">"base_url"</span><span class="bracket">:</span> <span class="string">"http://localhost:11434/v1"</span><span class="bracket">,</span>
+      <span class="key">"api_key"</span><span class="bracket">:</span> <span class="string">"ollama"</span><span class="bracket">,</span>
+      <span class="key">"models"</span><span class="bracket">:</span> <span class="bracket">[</span><span class="string">"llama3"</span><span class="bracket">,</span> <span class="string">"codellama"</span><span class="bracket">,</span> <span class="string">"mistral"</span><span class="bracket">]</span><span class="bracket">,</span>
+      <span class="key">"active_model"</span><span class="bracket">:</span> <span class="string">"codellama"</span>
+    <span class="bracket">}</span>
+  <span class="bracket">}</span><span class="bracket">,</span>
+  <span class="key">"active_provider"</span><span class="bracket">:</span> <span class="string">"ollama"</span>
+<span class="bracket">}</span>
+            </div>
+        </div>
+
+        <h3>Default Parameters</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Parameter</th><th>Value</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Temperature</td><td><code>0.1</code></td></tr>
+                    <tr><td>Max tokens</td><td><code>4096</code></td></tr>
+                    <tr><td>Max turns per query</td><td><code>200</code></td></tr>
+                    <tr><td>LLM timeout</td><td><code>120s</code></td></tr>
+                    <tr><td>Retry attempts</td><td><code>3</code></td></tr>
+                    <tr><td>Retry backoff</td><td>Exponential (2s, 4s, 8s)</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</main>
+
+<!-- Footer -->
+<footer class="site-footer">
+    <div class="footer-inner">
+        <div class="footer-left">
+            <span class="footer-logo">kly<span class="accent">xor</span></span>
+            <div class="footer-links">
+                <a href="https://github.com/alnyx/klyxor">GitHub</a>
+                <a href="https://www.npmjs.com/package/@alnyx/klyxor">npm</a>
+                <a href="index.html">Home</a>
+            </div>
+        </div>
+        <div class="footer-right">MIT License</div>
+    </div>
+</footer>
+
+<script>
+    // Copy buttons
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const text = btn.getAttribute('data-copy') || btn.closest('.code-block-body')?.textContent.trim();
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        });
+    });
+
+    // Sidebar active link tracking
+    const sections = document.querySelectorAll('.doc-section[id]');
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
+    const headerLinks = document.querySelectorAll('.header-nav a');
+
+    function updateActiveLink() {
+        let current = '';
+        sections.forEach(section => {
+            const rect = section.getBoundingClientRect();
+            if (rect.top <= 120) {
+                current = section.id;
+            }
+        });
+
+        sidebarLinks.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+        });
+
+        headerLinks.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+        });
+    }
+
+    window.addEventListener('scroll', updateActiveLink, { passive: true });
+    updateActiveLink();
+
+    // Hamburger menu
+    const hamburger = document.getElementById('hamburgerBtn');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+
+    hamburger.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('visible');
+    });
+
+    overlay.addEventListener('click', () => {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('visible');
+    });
+
+    // Close sidebar on link click (mobile)
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('visible');
+        });
+    });
+</script>
+
+</body>
+</html>
