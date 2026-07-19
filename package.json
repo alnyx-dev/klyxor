@@ -1,0 +1,24 @@
+{
+  "name": "klyxor",
+  "version": "1.0.0",
+  "description": "A coding agent with Plan/Build modes, subagent delegation, lazy-loaded skills, and a terminal chat interface.",
+  "type": "module",
+  "bin": {
+    "klyxor": "./src/cli.tsx"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.tsx",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "ink": "^5.1.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}
