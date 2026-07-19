@@ -1,14 +1,18 @@
 {
-  "name": "klyxor",
+  "name": "@alnyx/klyxor",
   "version": "1.0.0",
   "description": "A coding agent with Plan/Build modes, subagent delegation, lazy-loaded skills, and a terminal chat interface.",
   "type": "module",
   "bin": {
-    "klyxor": "./src/cli.tsx"
+    "klyxor": "./dist/cli.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsx src/cli.tsx",
-    "build": "tsc"
+    "build": "tsc",
+    "postinstall": "tsc"
   },
   "dependencies": {
     "ink": "^5.1.0",

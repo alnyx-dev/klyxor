@@ -1,12 +1,14 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as os from "node:os";
 import { MAX_SUBAGENT_DEPTH } from "./constants.js";
 
 export { MAX_SUBAGENT_DEPTH };
 
 export const APP_NAME = "Klyxor";
 
-export const KLYXOR_DIR = path.join(process.cwd(), ".klyxor");
+/** Global config directory at ~/.klyxor (user's home, not cwd). */
+export const KLYXOR_DIR = path.join(os.homedir(), ".klyxor");
 export const SKILLS_DIR = path.join(KLYXOR_DIR, "skills");
 export const CONFIG_FILE = path.join(KLYXOR_DIR, "config.json");
 export const SESSIONS_FILE = path.join(KLYXOR_DIR, "sessions.json");

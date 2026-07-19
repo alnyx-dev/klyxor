@@ -39,21 +39,39 @@
 ## 🚀 Quick Start
 
 ```bash
-# Install dependencies
-npm install
+# Install globally via npm
+npm install -g @alnyx/klyxor
 
-# Run in development mode
-npm run dev
+# Run from any directory
+klyxor
 
-# Build for production
-npm run build
+# Or use one-shot mode
+klyxor --plan "analyze this project"
+klyxor --build "add a new API endpoint"
 ```
 
-On first launch, klyxor creates a `.klyxor/` directory with your config, sessions, and skills.
+For development:
+
+```bash
+npm run dev          # Run with tsx (hot reload)
+npm run build        # Build to dist/
+```
+
+On first launch, klyxor creates `~/.klyxor/` in your home directory with config, sessions, and skills.
 
 ---
 
 ## ⚙️ Configuration
+
+All configuration lives in `~/.klyxor/` (your home directory):
+
+```
+~/.klyxor/
+├── config.json       # Provider settings, API keys, active model
+├── sessions.json     # Chat session history
+├── skills/           # Custom skill files (.md)
+└── exports/          # Exported session transcripts
+```
 
 ### Providers
 
