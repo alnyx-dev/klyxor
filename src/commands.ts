@@ -26,7 +26,7 @@ Anything else is sent to the agent as a chat message in the current session.`;
 
 export type CommandResult =
   | { type: "exit" }
-  | { type: "handled"; message?: string }
+  | { type: "handled"; message?: string; sessionChanged?: boolean }
   | { type: "chat"; text: string };
 
 export function handleCommand(
@@ -86,6 +86,7 @@ export function handleCommand(
         return {
           type: "handled",
           message: `→ switched to session '${arg}'`,
+          sessionChanged: true,
         };
       } catch {
         return {
@@ -104,6 +105,7 @@ export function handleCommand(
       return {
         type: "handled",
         message: `→ created and switched to session '${created}'`,
+        sessionChanged: true,
       };
     } catch (e) {
       return { type: "handled", message: String(e) };

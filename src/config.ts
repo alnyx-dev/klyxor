@@ -119,6 +119,23 @@ export function connectCommand(arg: string): string {
   return listProvidersText();
 }
 
+export function removeProvider(name: string): string {
+  if (!(name in _providers)) {
+    return `Unknown provider '${name}'`;
+  }
+  const names = Object.keys(_providers);
+  if (names.length === 1) {
+    return "Cannot remove the only provider";
+  }
+  delete _providers[name];
+  if (_activeProvider === name) {
+    const remaining = Object.keys(_providers);
+    _activeProvider = remaining[0];
+    return `Removed '${name}', switched to '${_activeProvider}'`;
+  }
+  return `Removed provider '${name}'`;
+}
+
 export function saveConfig(): void {
   try {
     const data: ConfigData = {

@@ -35,7 +35,9 @@ export class ChatSession {
   async send(userText: string, log: LogFn = console.log): Promise<string> {
     this.messages.push({ role: "user", content: userText });
     const tools = buildToolsForAgent(this.mode, 0, log);
-    return agentTurn(this.messages, tools, log, undefined, false);
+    const answer = await agentTurn(this.messages, tools, log, undefined, false);
+    this.messages.push({ role: "assistant", content: answer });
+    return answer;
   }
 
   toJSON(): ChatSessionData {

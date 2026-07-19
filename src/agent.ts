@@ -84,7 +84,7 @@ export async function agentTurn(
     }
 
     if (toolCalls.length === 0) {
-      log("✅ finished");
+      if (verbose) log("✅ finished");
       return content || "(empty response)";
     }
 
@@ -143,7 +143,7 @@ export async function agentTurn(
     }
   }
 
-  log(`⚠️  Max turns (${limit}) reached.`);
+  if (verbose) log(`⚠️  Max turns (${limit}) reached.`);
   return `[Error: hit max turns (${limit}) without a final answer]`;
 }
 
