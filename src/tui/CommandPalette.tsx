@@ -12,6 +12,7 @@ import {
   setActiveModel,
   saveConfig,
 } from "../config.js";
+import { discoverSkills, createSkill, getSkillInfo } from "../skills.js";
 import {
   BRAND_COLOR,
   PALETTE_UI_HEIGHT,
@@ -29,7 +30,7 @@ export interface CommandPaletteProps {
 }
 
 // ── Section definitions ──────────────────────────────────
-type SectionId = "sessions" | "providers" | "mode" | "actions";
+type SectionId = "sessions" | "providers" | "mode" | "skills" | "actions";
 
 interface SectionDef {
   id: SectionId;
@@ -41,7 +42,8 @@ const SECTIONS: SectionDef[] = [
   { id: "sessions", label: "Sessions", shortcut: "1" },
   { id: "providers", label: "Providers", shortcut: "2" },
   { id: "mode", label: "Mode", shortcut: "3" },
-  { id: "actions", label: "Actions", shortcut: "4" },
+  { id: "skills", label: "Skills", shortcut: "4" },
+  { id: "actions", label: "Actions", shortcut: "5" },
 ];
 
 const MODE_INFO: Record<string, { label: string; description: string }> = {
@@ -82,7 +84,15 @@ interface ActionItem {
   icon: string;
 }
 
-type SectionItem = SessionItem | ProviderItem | ModeItem | ActionItem;
+interface SkillItem {
+  type: "skill";
+  name: string;
+  description: string;
+  tags: string[];
+  triggers: string[];
+}
+
+type SectionItem = SessionItem | ProviderItem | ModeItem | SkillItem | ActionItem;
 
 // ── Build items per section ──────────────────────────────
 function buildSectionItems(section: SectionId, manager: SessionManager): SectionItem[] {
@@ -136,9 +146,22 @@ function buildSectionItems(section: SectionId, manager: SessionManager): Section
     case "actions":
       items.push({ type: "action", id: "new-session", label: "New Session", icon: "+" });
       items.push({ type: "action", id: "reset-session", label: "Reset Session", icon: "r" });
-      items.push({ type: "action", id: "skills", label: "Skills", icon: "s" });
       items.push({ type: "action", id: "help", label: "Help", icon: "?" });
       break;
+
+    case "skills": {
+      const skills = discoverSkills();
+      for (const [name, info] of Object.entries(skills)) {
+        items.push({
+          type: "skill",
+          name,
+          description: info.description,
+          tags: info.metadata.tags || [],
+          triggers: info.metadata.triggers || [],
+        });
+      }
+      break;
+    }
   }
 
   return items;
@@ -158,7 +181,7 @@ export function CommandPalette({
   const [activeTab, setActiveTab] = useState<SectionId>("sessions");
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
-  const [subMode, setSubMode] = useState<"list" | "add-session" | "add-model" | "add-provider" | "select-model" | "confirm-delete">("list");
+  const [subMode, setSubMode] = useState<"list" | "add-session" | "add-model" | "add-provider" | "select-model" | "skill-info" | "add-skill" | "confirm-delete">("list");
   const [addInput, setAddInput] = useState("");
   const [modelTarget, setModelTarget] = useState<string | null>(null);
   const [selectModelTarget, setSelectModelTarget] = useState<string | null>(null);
@@ -298,6 +321,25 @@ export function CommandPalette({
       return;
     }
 
+    // -- skill-info sub-mode --
+    if (subMode === "skill-info") {
+      if (key.escape || key.return) {
+        setSubMode("list");
+        setCursor(0);
+        setScrollOffset(0);
+      }
+      return;
+    }
+
+    // -- add-skill sub-mode --
+    if (subMode === "add-skill") {
+      if (key.escape) {
+        setSubMode("list");
+        setAddInput("");
+      }
+      return;
+    }
+
     // -- list mode (normal) --
     if (key.escape) {
       onCancel();
@@ -317,7 +359,8 @@ export function CommandPalette({
     if (inputStr === "1") { setActiveTab("sessions"); setCursor(0); setScrollOffset(0); return; }
     if (inputStr === "2") { setActiveTab("providers"); setCursor(0); setScrollOffset(0); return; }
     if (inputStr === "3") { setActiveTab("mode"); setCursor(0); setScrollOffset(0); return; }
-    if (inputStr === "4") { setActiveTab("actions"); setCursor(0); setScrollOffset(0); return; }
+    if (inputStr === "4") { setActiveTab("skills"); setCursor(0); setScrollOffset(0); return; }
+    if (inputStr === "5") { setActiveTab("actions"); setCursor(0); setScrollOffset(0); return; }
 
     // Item navigation
     if (key.upArrow || inputStr === "k") {
@@ -367,6 +410,11 @@ export function CommandPalette({
             onAction(item.id);
           }
           break;
+        case "skill":
+          setSubMode("skill-info");
+          setCursor(0);
+          setScrollOffset(0);
+          break;
       }
       return;
     }
@@ -408,6 +456,13 @@ export function CommandPalette({
         setDeleteTarget({ name: item.name, kind: "provider" });
         setSubMode("confirm-delete");
       }
+      return;
+    }
+
+    // n = new skill (in skills tab)
+    if (inputStr === "n" && activeTab === "skills") {
+      setSubMode("add-skill");
+      setAddInput("");
       return;
     }
   });
@@ -468,6 +523,19 @@ export function CommandPalette({
       }
     },
     [providerForm, refresh]
+  );
+
+  const handleAddSkillSubmit = useCallback(
+    (text: string) => {
+      const name = text.trim();
+      if (name) {
+        const result = createSkill(name);
+        refresh();
+      }
+      setSubMode("list");
+      setAddInput("");
+    },
+    [refresh]
   );
 
   // ── Pre-hooks for all render paths (must be before any early returns) ──
@@ -643,6 +711,57 @@ export function CommandPalette({
     );
   }
 
+  // ── skill-info sub-mode ──────────────────────────────
+  if (subMode === "skill-info") {
+    const skillItem = items.find((it, i) => i === safeCursor && it.type === "skill") as SkillItem | undefined;
+    if (skillItem) {
+      const info = getSkillInfo(skillItem.name);
+      return (
+        <Box
+          flexDirection="column"
+          borderStyle="round"
+          borderColor={BRAND_COLOR}
+          padding={1}
+        >
+          <Text bold color={BRAND_COLOR}>{skillItem.name}</Text>
+          <Box marginTop={1}>
+            <Text>{info}</Text>
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>Enter/Esc = back</Text>
+          </Box>
+        </Box>
+      );
+    }
+    // fallback: no skill selected
+    setSubMode("list");
+  }
+
+  // ── add-skill sub-mode ──────────────────────────────
+  if (subMode === "add-skill") {
+    return (
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={BRAND_COLOR}
+        padding={1}
+      >
+        <Text bold>New skill name:</Text>
+        <Box marginTop={1}>
+          <TextInput
+            value={addInput}
+            onChange={setAddInput}
+            onSubmit={handleAddSkillSubmit}
+            placeholder="my-skill"
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter = create, Esc = cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box
       flexDirection="column"
@@ -751,6 +870,27 @@ export function CommandPalette({
                       </Text>
                     </Text>
                   );
+                case "skill":
+                  return (
+                    <Box key={item.name} flexDirection="column">
+                      <Text>
+                        {prefix}
+                        <Text bold color={BRAND_COLOR}>
+                          {item.name}
+                        </Text>
+                        <Text>
+                          {" "}
+                          <Text dimColor>{item.description}</Text>
+                        </Text>
+                      </Text>
+                      {item.tags.length > 0 && (
+                        <Text dimColor>
+                          {"    "}
+                          tags: {item.tags.join(", ")}
+                        </Text>
+                      )}
+                    </Box>
+                  );
                 default:
                   return null;
               }
@@ -768,6 +908,7 @@ export function CommandPalette({
           h/l = tab, j/k = nav, Enter = select, Esc = close
           {activeTab === "sessions" ? ", n = new, d = delete" : ""}
           {activeTab === "providers" ? ", a = add model, A = add provider, d = delete" : ""}
+          {activeTab === "skills" ? ", n = new skill" : ""}
         </Text>
       </Box>
     </Box>

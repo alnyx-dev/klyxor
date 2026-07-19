@@ -198,7 +198,7 @@ export function App({ manager }: AppProps) {
       setInput("");
 
       if (trimmed.startsWith("/")) {
-        const result = handleCommand(trimmed, manager);
+        const result = await handleCommand(trimmed, manager);
         switch (result.type) {
           case "exit":
             saveState(manager);

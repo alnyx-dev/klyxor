@@ -1,6 +1,6 @@
 import { callLlm, type LlmMessage } from "./llm.js";
-import { buildTools, type Tool, type LogFn } from "./tools.js";
-import { makeListSkillsTool, makeReadSkillTool } from "./skills.js";
+import { buildTools, type Tool, type LogFn, type TaskProvider } from "./tools.js";
+import { makeListSkillsTool, makeReadSkillTool, makeFindSkillsTool } from "./skills.js";
 import { DEFAULT_MAX_TURNS, SEPARATOR_WIDTH, PREVIEW, DEFAULT_MODE } from "./constants.js";
 
 export type { LogFn } from "./tools.js";
@@ -39,11 +39,13 @@ export const MODE_PROMPTS: Record<string, string> = {
 export function buildToolsForAgent(
   mode: string,
   depth: number,
-  log: LogFn
+  log: LogFn,
+  taskProvider?: TaskProvider
 ): Map<string, Tool> {
-  const tools = buildTools(mode, depth, log, runAgent);
+  const tools = buildTools(mode, depth, log, runAgent, taskProvider);
   tools.set("list_skills", makeListSkillsTool());
   tools.set("read_skill", makeReadSkillTool());
+  tools.set("find_skills", makeFindSkillsTool());
   return tools;
 }
 

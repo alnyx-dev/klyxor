@@ -11,9 +11,19 @@ import {
   SKIP_DIRS,
   MODE_PLAN,
   MODE_BUILD,
+  WEB_FETCH_MAX_CHARS,
+  WEB_FETCH_TIMEOUT_MS,
 } from "./constants.js";
 
 export type LogFn = (msg: string) => void;
+
+/** Minimal task type used by the todo_list tool. Defined here to avoid circular imports. */
+export interface TaskItem {
+  id: number;
+  text: string;
+  status: "pending" | "in_progress" | "done";
+  created: string;
+}
 
 export interface ToolParameterProperty {
   type: string;
@@ -315,6 +325,7 @@ export function makeListFilesTool(): Tool {
         for (const entry of entries) {
           const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
           if (entry.isDirectory()) {
+            if (SKIP_DIRS.has(entry.name)) continue;
             walk(path.join(dir, entry.name), entryRel);
           } else {
             if (pat === "*" || pat === "**/*") {
@@ -456,6 +467,108 @@ export function makeGrepTool(): Tool {
   );
 }
 
+export function makeGitStatusTool(): Tool {
+  function handler(): string {
+    return runBash("git status --short --branch");
+  }
+  return createTool(
+    "git_status",
+    "Show the current git status (branch + changed/untracked files, short format).",
+    { type: "object", properties: {} },
+    handler
+  );
+}
+
+export function makeGitDiffTool(): Tool {
+  function handler(pathArg?: string, staged?: boolean): string {
+    const parts = ["git", "diff", "--no-color"];
+    if (staged) parts.push("--staged");
+    if (pathArg && pathArg.trim()) parts.push("--", pathArg.trim());
+    const out = runBash(parts.join(" "));
+    return out.trim() === "" ? "(no changes)" : out;
+  }
+  return createTool(
+    "git_diff",
+    "Show the git diff of working-tree changes. Set staged=true for staged changes; " +
+      "optionally limit to a single path.",
+    {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Optional file/directory path to limit the diff.",
+        },
+        staged: {
+          type: "boolean",
+          description: "If true, show staged (index) changes instead of working tree.",
+        },
+      },
+    },
+    handler
+  );
+}
+
+export function makeWebFetchTool(): Tool {
+  async function handler(url?: string): Promise<string> {
+    if (!url || !/^https?:\/\//i.test(url)) {
+      return "Error: 'url' must be an http(s) URL.";
+    }
+    try {
+      const resp = await fetch(url, {
+        redirect: "follow",
+        headers: { "User-Agent": "klyxor-web-fetch/1.0" },
+        signal: AbortSignal.timeout(WEB_FETCH_TIMEOUT_MS),
+      });
+      if (!resp.ok) {
+        return `Error: HTTP ${resp.status} ${resp.statusText} for ${url}`;
+      }
+      const contentType = resp.headers.get("content-type") || "";
+      const raw = await resp.text();
+
+      let text = raw;
+      if (contentType.includes("html") || /<html[\s>]/i.test(raw)) {
+        text = raw
+          .replace(/<script[\s\S]*?<\/script>/gi, " ")
+          .replace(/<style[\s\S]*?<\/style>/gi, " ")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/gi, " ")
+          .replace(/&amp;/gi, "&")
+          .replace(/&lt;/gi, "<")
+          .replace(/&gt;/gi, ">")
+          .replace(/&quot;/gi, '"')
+          .replace(/&#39;/gi, "'")
+          .replace(/[ \t]+/g, " ")
+          .replace(/\n\s*\n\s*\n+/g, "\n\n")
+          .trim();
+      }
+
+      if (text.length > WEB_FETCH_MAX_CHARS) {
+        text =
+          text.slice(0, WEB_FETCH_MAX_CHARS) +
+          `\n…[truncated at ${WEB_FETCH_MAX_CHARS} chars]`;
+      }
+      return text || "(empty response)";
+    } catch (e) {
+      return `Error fetching ${url}: ${e}`;
+    }
+  }
+  return createTool(
+    "web_fetch",
+    "Fetch a URL over HTTP(S) and return its text content (HTML is stripped to readable text).",
+    {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "The http(s) URL to fetch.",
+        },
+      },
+      required: ["url"],
+    },
+    handler
+  );
+}
+
 function makeDelegateTool(
   depth: number,
   log: LogFn,
@@ -504,6 +617,109 @@ function makeDelegateTool(
   );
 }
 
+/**
+ * Provider that supplies tasks and the ability to generate new IDs.
+ * Implemented by ChatSession; passed by reference to avoid circular imports.
+ */
+export interface TaskProvider {
+  tasks: TaskItem[];
+  nextTaskId(): number;
+}
+
+function makeTodoListTool(provider: TaskProvider): Tool {
+  function renderList(): string {
+    const { tasks } = provider;
+    if (tasks.length === 0) return "(empty)";
+    return tasks.map((t) => {
+      const mark = t.status === "done" ? "✓" : t.status === "in_progress" ? "►" : "○";
+      return `${mark} [${t.id}] ${t.text}`;
+    }).join("\n");
+  }
+
+  function handler(
+    action?: string,
+    id?: number,
+    text?: string,
+    status?: string
+  ): string {
+    const act = (action || "list").toLowerCase();
+    const { tasks } = provider;
+
+    if (act === "list") {
+      return `📋 Todo list:\n${renderList()}`;
+    }
+
+    if (act === "add") {
+      if (!text || !text.trim()) return "Error: 'text' is required for add.";
+      const task: TaskItem = {
+        id: provider.nextTaskId(),
+        text: text.trim(),
+        status: "pending",
+        created: new Date().toISOString(),
+      };
+      tasks.push(task);
+      return `Added task [${task.id}]: ${task.text}\n\n📋 Current todo list:\n${renderList()}`;
+    }
+
+    if (act === "update") {
+      if (id == null) return "Error: 'id' is required for update.";
+      const task = tasks.find((t) => t.id === id);
+      if (!task) return `Error: task [${id}] not found.`;
+      if (text && text.trim()) task.text = text.trim();
+      if (status) {
+        const normalized = status.toLowerCase();
+        if (normalized === "pending" || normalized === "in_progress" || normalized === "done") {
+          task.status = normalized;
+        } else {
+          return `Error: status must be 'pending', 'in_progress', or 'done'. Got '${status}'.`;
+        }
+      }
+      return `Updated task [${task.id}]: ${task.text} (${task.status})\n\n📋 Current todo list:\n${renderList()}`;
+    }
+
+    if (act === "delete" || act === "remove") {
+      if (id == null) return "Error: 'id' is required for delete.";
+      const idx = tasks.findIndex((t) => t.id === id);
+      if (idx === -1) return `Error: task [${id}] not found.`;
+      const removed = tasks.splice(idx, 1)[0]!;
+      return `Deleted task [${removed.id}]: ${removed.text}\n\n📋 Current todo list:\n${renderList()}`;
+    }
+
+    return `Error: unknown action '${act}'. Valid: list, add, update, delete.`;
+  }
+
+  return createTool(
+    "todo_list",
+    "Manage a task list for tracking progress through multi-step work. " +
+      "Use 'add' to create tasks, 'update' to change status/text, 'delete' to remove, 'list' to view all. " +
+      "Set status to 'in_progress' when starting a task and 'done' when finished.",
+    {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["add", "update", "delete", "list"],
+          description: "Action: add, update, delete, or list. Default 'list'.",
+        },
+        id: {
+          type: "number",
+          description: "Task ID (required for update/delete).",
+        },
+        text: {
+          type: "string",
+          description: "Task description (required for add; optional for update to change text).",
+        },
+        status: {
+          type: "string",
+          enum: ["pending", "in_progress", "done"],
+          description: "New status (for update only).",
+        },
+      },
+    },
+    handler
+  );
+}
+
 export function buildTools(
   mode: string,
   depth: number,
@@ -513,7 +729,8 @@ export function buildTools(
     mode: string,
     depth: number,
     log: LogFn
-  ) => Promise<string>
+  ) => Promise<string>,
+  taskProvider?: TaskProvider
 ): Map<string, Tool> {
   const readOnly = mode === "plan";
   const toolList: Tool[] = [
@@ -521,7 +738,15 @@ export function buildTools(
     makeReadFileTool(),
     makeListFilesTool(),
     makeGrepTool(),
+    makeGitStatusTool(),
+    makeGitDiffTool(),
+    makeWebFetchTool(),
   ];
+
+  // Todo tool always available (read-only operations are non-destructive).
+  if (taskProvider) {
+    toolList.push(makeTodoListTool(taskProvider));
+  }
 
   if (!readOnly) {
     toolList.push(makeWriteFileTool());

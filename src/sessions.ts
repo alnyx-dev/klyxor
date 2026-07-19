@@ -3,51 +3,75 @@ import { SESSIONS_FILE, saveConfig } from "./config.js";
 import { DEFAULT_MODE, SESSION_NAME_PREFIX, PREVIEW } from "./constants.js";
 import type { LlmMessage } from "./llm.js";
 import { agentTurn, MODE_PROMPTS, buildToolsForAgent } from "./agent.js";
-import type { LogFn } from "./tools.js";
+import { compactMessages, shouldCompact } from "./compact.js";
+import { withProjectContext } from "./context.js";
+import type { LogFn, TaskItem } from "./tools.js";
+
+export type Task = TaskItem;
 
 export interface ChatSessionData {
   mode: string;
   messages: LlmMessage[];
+  tasks?: TaskItem[];
 }
 
 export class ChatSession {
   mode: string;
   unsaved: boolean;
   messages: LlmMessage[];
+  tasks: Task[];
+  private _nextTaskId: number;
 
   constructor(mode: string = DEFAULT_MODE, unsaved: boolean = false) {
     this.mode = mode;
     this.unsaved = unsaved;
-    this.messages = [{ role: "system", content: MODE_PROMPTS[this.mode] }];
+    this.messages = [{ role: "system", content: withProjectContext(MODE_PROMPTS[this.mode]) }];
+    this.tasks = [];
+    this._nextTaskId = 1;
   }
 
   setMode(mode: string): void {
     if (!(mode in MODE_PROMPTS)) return;
     this.mode = mode;
     // Swap the system prompt for subsequent turns; prior history is kept.
-    this.messages[0] = { role: "system", content: MODE_PROMPTS[mode] };
+    this.messages[0] = { role: "system", content: withProjectContext(MODE_PROMPTS[mode]) };
   }
 
   reset(): void {
     const mode = this.mode;
-    this.messages = [{ role: "system", content: MODE_PROMPTS[mode] }];
+    this.messages = [{ role: "system", content: withProjectContext(MODE_PROMPTS[mode]) }];
+    this.tasks = [];
+    this._nextTaskId = 1;
+  }
+
+  /** Return the next auto-incremented task ID. */
+  nextTaskId(): number {
+    return this._nextTaskId++;
   }
 
   async send(userText: string, log: LogFn = console.log): Promise<string> {
     this.messages.push({ role: "user", content: userText });
-    const tools = buildToolsForAgent(this.mode, 0, log);
+    // Auto-compact if messages have grown too large.
+    if (shouldCompact(this.messages)) {
+      this.messages = await compactMessages(this.messages);
+    }
+    const tools = buildToolsForAgent(this.mode, 0, log, this);
     const answer = await agentTurn(this.messages, tools, log, undefined, false);
     this.messages.push({ role: "assistant", content: answer });
     return answer;
   }
 
   toJSON(): ChatSessionData {
-    return { mode: this.mode, messages: this.messages };
+    return { mode: this.mode, messages: this.messages, tasks: this.tasks };
   }
 
   static fromJSON(data: ChatSessionData): ChatSession {
     const session = new ChatSession(data.mode, false);
     session.messages = data.messages || [{ role: "system", content: MODE_PROMPTS[data.mode] }];
+    session.tasks = data.tasks || [];
+    if (session.tasks.length > 0) {
+      session._nextTaskId = Math.max(...session.tasks.map((t) => t.id)) + 1;
+    }
     return session;
   }
 }

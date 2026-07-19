@@ -91,7 +91,35 @@ export function setActiveProviderName(name: string): void {
   _activeProvider = name;
 }
 
+/**
+ * Resolve an api_key value, expanding environment-variable references.
+ * Supports three forms:
+ *   - "${MY_ENV_VAR}"  → value of process.env.MY_ENV_VAR
+ *   - "env:MY_ENV_VAR" → value of process.env.MY_ENV_VAR
+ *   - a literal key string → returned as-is
+ * Falls back to KLYXOR_API_KEY if the stored value is empty/placeholder.
+ */
+export function resolveApiKey(raw: string | undefined): string {
+  const placeholder = !raw || raw === "..." || raw.trim() === "";
+  if (!placeholder) {
+    const braceMatch = raw.match(/^\$\{([A-Z0-9_]+)\}$/i);
+    if (braceMatch) return process.env[braceMatch[1]] || "";
+    if (raw.startsWith("env:")) return process.env[raw.slice(4)] || "";
+    return raw;
+  }
+  return process.env.KLYXOR_API_KEY || "";
+}
+
 export function getActiveProvider(): Provider {
+  const p = _providers[_activeProvider];
+  if (!p) return p;
+  // Return a shallow clone with the api_key resolved from env when applicable,
+  // so callers (llm.ts) always get a usable key without mutating stored config.
+  return { ...p, api_key: resolveApiKey(p.api_key) };
+}
+
+/** The provider record exactly as stored (unresolved api_key). For config editing. */
+export function getRawActiveProvider(): Provider {
   return _providers[_activeProvider];
 }
 

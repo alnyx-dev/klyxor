@@ -24,6 +24,15 @@
 | 🧩 **Skills System** | Lazy-loaded `.md` skill files from `.klyxor/skills/` |
 | 💾 **Session Persistence** | Sessions saved to `.klyxor/sessions.json` |
 | ⏳ **Animated Spinner** | Visual loading indicator with tool name display |
+| 🔄 **LLM Retry + Backoff** | Exponential backoff on transient failures (408/429/5xx) |
+| 💰 **Token & Cost Tracking** | Per-model usage statistics and estimated costs |
+| 📦 **Context Compaction** | Auto-summarizes old conversation turns when messages exceed threshold |
+| 📂 **Project Context** | Auto-loads `AGENTS.md` / `KLYXOR.md` / `.klyxor/context.md` into system prompt |
+| 🌐 **Web Fetch Tool** | Fetch URLs and extract readable text from HTML pages |
+| 🔧 **Git Tools** | `git_status` and `git_diff` tools for version control context |
+| 📝 **Session Export** | Export chat transcripts to Markdown files |
+| 📋 **Todo List Tool** | Agent can create, update, delete, and track tasks during execution |
+| 🔑 **Env-Var API Keys** | API keys support `${ENV_VAR}` expansion with `KLYXOR_API_KEY` fallback |
 
 ---
 
@@ -112,12 +121,16 @@ src/
 ├── cli.tsx              # Entry point
 ├── agent.ts             # Core agent loop (tool-calling)
 ├── llm.ts               # LLM HTTP client (OpenAI-compatible)
-├── tools.ts             # Tool definitions (bash, read/write/edit, delegate)
-├── commands.ts          # Slash commands
+├── tools.ts             # Tool definitions (bash, read/write/edit, delegate, git, web, todo)
+├── commands.ts          # Slash commands (/help, /plan, /build, /cost, /export, etc.)
 ├── config.ts            # Provider config, .klyxor/ init
 ├── constants.ts         # Centralized constants
-├── sessions.ts          # Session persistence
+├── sessions.ts          # Session persistence + todo list
 ├── skills.ts            # Skill system
+├── usage.ts             # Token/cost tracking per model
+├── compact.ts           # Context compaction (summarize old turns)
+├── context.ts           # Project context auto-loader
+├── export.ts            # Session export to Markdown
 └── tui/
     ├── App.tsx              # Main app layout
     ├── CommandPalette.tsx   # Tabbed menu
@@ -136,11 +149,37 @@ All magic numbers and hardcoded values are centralized in `src/constants.ts`:
 
 | Category | Examples |
 |----------|----------|
-| ⏱️ Timeouts | Bash (120s), LLM fetch (120s) |
+| ⏱️ Timeouts | Bash (120s), LLM fetch (120s), web fetch (20s) |
 | 📊 Limits | Max turns (200), file read (2000 lines), grep results (200) |
-| 🎨 UI | Brand color (`#DA7756`), separator widths, preview lengths |
-| 🤖 LLM | Temperature (0.1), max tokens (4096), endpoint |
+| 🎨 UI | Brand color (`#51ff48`), separator widths, preview lengths |
+| 🤖 LLM | Temperature (0.1), max tokens (4096), endpoint, retry (3 attempts) |
+| 📦 Compaction | Threshold (60 messages), keep recent (20) |
 | 📁 Skip | `.git`, `__pycache__`, `node_modules`, `.klyxor` |
+
+---
+
+## 💬 Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/plan` | Switch to Plan mode (read-only) |
+| `/build` | Switch to Build mode (full access) |
+| `/reset` | Clear session history |
+| `/sessions [name]` | List sessions or switch to one |
+| `/new [name]` | Create and switch to a new session |
+| `/connect [name]` | Switch provider or list available |
+| `/model [name]` | Show current model or switch |
+| `/skills` | List available skills |
+| `/skills create <name>` | Create a new skill |
+| `/skills info <name>` | Show skill details |
+| `/skills find <query>` | Find skills matching a file or task |
+| `/cost` | Show token usage and estimated cost |
+| `/tokens` | Alias for `/cost` |
+| `/tools` | List available tools in current mode |
+| `/export [path]` | Export session to Markdown file |
+| `/compact` | Manually compress conversation history |
+| `/exit`, `/quit` | Save and exit |
 
 ---
 

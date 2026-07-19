@@ -15,6 +15,14 @@ export const DEFAULT_MODE = MODE_BUILD;
 export const BASH_TIMEOUT_MS = 120_000;
 export const LLM_TIMEOUT_MS = 120_000;
 
+// ── LLM retry / backoff ────────────────────────────────────────
+/** Number of attempts for a transient LLM failure (network/5xx/429). */
+export const LLM_MAX_RETRIES = 3;
+/** Base backoff delay (ms); grows exponentially per attempt. */
+export const LLM_RETRY_BASE_MS = 800;
+/** HTTP status codes that are safe to retry. */
+export const LLM_RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
 // ── Limits ─────────────────────────────────────────────────────
 export const DEFAULT_MAX_TURNS = 200;
 export const DEFAULT_READ_FILE_LIMIT = 2000;
@@ -22,6 +30,25 @@ export const MAX_LIST_FILES_RESULTS = 200;
 export const MAX_GREP_RESULTS = 200;
 export const DEFAULT_MAX_TOKENS = 4096;
 export const MAX_SUBAGENT_DEPTH = 2;
+
+// ── Context compaction ─────────────────────────────────────────
+/** When a session exceeds this many messages, auto-compact older turns. */
+export const COMPACT_THRESHOLD_MESSAGES = 60;
+/** How many of the most-recent messages to keep verbatim after compaction. */
+export const COMPACT_KEEP_RECENT = 20;
+
+// ── Web fetch ──────────────────────────────────────────────────
+/** Max characters returned by the web_fetch tool. */
+export const WEB_FETCH_MAX_CHARS = 8000;
+/** Timeout for web_fetch requests (ms). */
+export const WEB_FETCH_TIMEOUT_MS = 20_000;
+
+// ── Project context files (auto-loaded into system prompt) ─────
+export const PROJECT_CONTEXT_FILES = [
+  "AGENTS.md",
+  "KLYXOR.md",
+  ".klyxor/context.md",
+];
 
 // ── Preview / truncation lengths ───────────────────────────────
 export const PREVIEW = {

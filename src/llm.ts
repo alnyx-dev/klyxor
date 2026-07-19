@@ -1,5 +1,14 @@
 import { getActiveProvider, getActiveProviderName, getActiveModel } from "./config.js";
-import { LLM_DEFAULTS, LLM_TIMEOUT_MS } from "./constants.js";
+import {
+  LLM_DEFAULTS,
+  LLM_TIMEOUT_MS,
+  LLM_MAX_RETRIES,
+  LLM_RETRY_BASE_MS,
+  LLM_RETRYABLE_STATUS,
+} from "./constants.js";
+import { usageTracker } from "./usage.js";
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 export interface LlmMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -36,8 +45,9 @@ export async function callLlm(
     "Content-Type": "application/json",
     Authorization: `Bearer ${provider.api_key}`,
   };
+  const model = getActiveModel(provider);
   const payload = {
-    model: getActiveModel(provider),
+    model,
     messages,
     tools,
     tool_choice: LLM_DEFAULTS.toolChoice,
@@ -45,41 +55,73 @@ export async function callLlm(
     max_tokens: LLM_DEFAULTS.maxTokens,
   };
 
-  try {
-    const resp = await fetch(`${provider.base_url}${LLM_DEFAULTS.endpoint}`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-    });
+  let lastError = "";
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error(
-        `⚠️  LLM request failed (${getActiveProviderName()}): ${resp.status} ${text}`
-      );
-      return { content: null, tool_calls: [] };
+  for (let attempt = 0; attempt < LLM_MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      // Exponential backoff before a retry.
+      await sleep(LLM_RETRY_BASE_MS * 2 ** (attempt - 1));
     }
 
-    const json = (await resp.json()) as {
-      choices: Array<{
-        message: {
-          content?: string | null;
-          tool_calls?: ToolCall[];
+    try {
+      const resp = await fetch(`${provider.base_url}${LLM_DEFAULTS.endpoint}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        lastError = `${resp.status} ${text}`;
+        if (LLM_RETRYABLE_STATUS.has(resp.status) && attempt < LLM_MAX_RETRIES - 1) {
+          console.error(
+            `⚠️  LLM request failed (${getActiveProviderName()}): ${lastError} — retrying (${attempt + 1}/${LLM_MAX_RETRIES})`
+          );
+          continue;
+        }
+        console.error(
+          `⚠️  LLM request failed (${getActiveProviderName()}): ${lastError}`
+        );
+        return { content: null, tool_calls: [] };
+      }
+
+      const json = (await resp.json()) as {
+        choices: Array<{
+          message: {
+            content?: string | null;
+            tool_calls?: ToolCall[];
+          };
+        }>;
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
         };
-      }>;
-    };
+      };
 
-    const msg = json.choices[0]?.message;
-    if (!msg) return { content: null, tool_calls: [] };
+      usageTracker.record(json.usage, model);
 
-    const content = (msg.content || "").trim();
-    const tool_calls = msg.tool_calls || [];
-    return { content, tool_calls };
-  } catch (e) {
-    console.error(
-      `⚠️  LLM request failed (${getActiveProviderName()}): ${e}`
-    );
-    return { content: null, tool_calls: [] };
+      const msg = json.choices[0]?.message;
+      if (!msg) return { content: null, tool_calls: [] };
+
+      const content = (msg.content || "").trim();
+      const tool_calls = msg.tool_calls || [];
+      return { content, tool_calls };
+    } catch (e) {
+      // Network error / timeout — retryable.
+      lastError = String(e);
+      if (attempt < LLM_MAX_RETRIES - 1) {
+        console.error(
+          `⚠️  LLM request failed (${getActiveProviderName()}): ${lastError} — retrying (${attempt + 1}/${LLM_MAX_RETRIES})`
+        );
+        continue;
+      }
+    }
   }
+
+  console.error(
+    `⚠️  LLM request failed (${getActiveProviderName()}): ${lastError}`
+  );
+  return { content: null, tool_calls: [] };
 }
