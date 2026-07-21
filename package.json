@@ -1,6 +1,6 @@
 {
   "name": "@alnyx/klyxor",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A coding agent with Plan/Build modes, subagent delegation, lazy-loaded skills, and a terminal chat interface.",
   "type": "module",
   "bin": {
