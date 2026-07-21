@@ -36,6 +36,8 @@ export const MAX_LIST_FILES_RESULTS = 200;
 export const MAX_GREP_RESULTS = 200;
 export const DEFAULT_MAX_TOKENS = 4096;
 export const MAX_SUBAGENT_DEPTH = 2;
+/** Max file size in bytes for read_file, edit_file, and hash tools (10 MB). */
+export const MAX_FILE_READ_SIZE = 10 * 1024 * 1024;
 
 // ── Subagent pool ──────────────────────────────────────────────
 /** Maximum number of subagents that can run in parallel via spawn_parallel. */

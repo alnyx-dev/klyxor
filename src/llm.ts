@@ -2,8 +2,6 @@ import { getActiveProvider, getActiveProviderName, getActiveModel } from "./conf
 import {
   LLM_DEFAULTS,
   LLM_TIMEOUT_MS,
-  LLM_MAX_RETRIES,
-  LLM_RETRY_BASE_MS,
   LLM_RETRYABLE_STATUS,
   ERROR_RECOVERY_MAX_RETRIES,
   ERROR_RECOVERY_BASE_DELAY_MS,
@@ -35,14 +33,27 @@ export interface LlmResponse {
   tool_calls: ToolCall[];
 }
 
+export interface ToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, unknown>;
+      required?: string[];
+    };
+  };
+}
+
 /**
- * Call the OpenAI-compatible /chat/completions endpoint.
- * Returns { content, tool_calls } on success, or { content: null, tool_calls: [] } on failure.
+ * Call the OpenAI-compatible /chat/completions endpoint (single attempt).
+ * Returns { content, tool_calls } on success.
+ * Throws on HTTP errors or network failures — callers handle retry/recovery.
  */
 export async function callLlm(
   messages: LlmMessage[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tools: Array<{ type: string; function: { name: string; description: string; parameters: any } }>
+  tools: ToolDefinition[]
 ): Promise<LlmResponse> {
   const provider = getActiveProvider();
   const headers: Record<string, string> = {
@@ -59,75 +70,40 @@ export async function callLlm(
     max_tokens: LLM_DEFAULTS.maxTokens,
   };
 
-  let lastError = "";
+  const resp = await fetch(`${provider.base_url}${LLM_DEFAULTS.endpoint}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+  });
 
-  for (let attempt = 0; attempt < LLM_MAX_RETRIES; attempt++) {
-    if (attempt > 0) {
-      // Exponential backoff before a retry.
-      await sleep(LLM_RETRY_BASE_MS * 2 ** (attempt - 1));
-    }
-
-    try {
-      const resp = await fetch(`${provider.base_url}${LLM_DEFAULTS.endpoint}`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-      });
-
-      if (!resp.ok) {
-        const text = await resp.text();
-        lastError = `${resp.status} ${text}`;
-        if (LLM_RETRYABLE_STATUS.has(resp.status) && attempt < LLM_MAX_RETRIES - 1) {
-          console.error(
-            `⚠️  LLM request failed (${getActiveProviderName()}): ${lastError} — retrying (${attempt + 1}/${LLM_MAX_RETRIES})`
-          );
-          continue;
-        }
-        console.error(
-          `⚠️  LLM request failed (${getActiveProviderName()}): ${lastError}`
-        );
-        return { content: null, tool_calls: [] };
-      }
-
-      const json = (await resp.json()) as {
-        choices: Array<{
-          message: {
-            content?: string | null;
-            tool_calls?: ToolCall[];
-          };
-        }>;
-        usage?: {
-          prompt_tokens?: number;
-          completion_tokens?: number;
-          total_tokens?: number;
-        };
-      };
-
-      usageTracker.record(json.usage, model);
-
-      const msg = json.choices[0]?.message;
-      if (!msg) return { content: null, tool_calls: [] };
-
-      const content = (msg.content || "").trim();
-      const tool_calls = msg.tool_calls || [];
-      return { content, tool_calls };
-    } catch (e) {
-      // Network error / timeout — retryable.
-      lastError = String(e);
-      if (attempt < LLM_MAX_RETRIES - 1) {
-        console.error(
-          `⚠️  LLM request failed (${getActiveProviderName()}): ${lastError} — retrying (${attempt + 1}/${LLM_MAX_RETRIES})`
-        );
-        continue;
-      }
-    }
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`LLM request failed (${getActiveProviderName()}): ${resp.status} ${text}`);
   }
 
-  console.error(
-    `⚠️  LLM request failed (${getActiveProviderName()}): ${lastError}`
-  );
-  return { content: null, tool_calls: [] };
+  const json = (await resp.json()) as {
+    choices: Array<{
+      message: {
+        content?: string | null;
+        tool_calls?: ToolCall[];
+      };
+    }>;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+  };
+
+  usageTracker.record(json.usage, model);
+
+  const msg = json.choices[0]?.message;
+  if (!msg) return { content: null, tool_calls: [] };
+
+  const content = (msg.content || "").trim();
+  const tool_calls = msg.tool_calls || [];
+  return { content, tool_calls };
 }
 
 // ── Streaming ────────────────────────────────────────────────────
@@ -150,8 +126,7 @@ export interface LlmStreamChunk {
  */
 export async function* callLlmStream(
   messages: LlmMessage[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tools: Array<{ type: string; function: { name: string; description: string; parameters: any } }>
+  tools: ToolDefinition[]
 ): AsyncGenerator<LlmStreamChunk> {
   const provider = getActiveProvider();
   const headers: Record<string, string> = {
@@ -169,22 +144,38 @@ export async function* callLlmStream(
     stream: true,
   };
 
-  let response: Response;
-  try {
-    response = await fetch(`${provider.base_url}${LLM_DEFAULTS.endpoint}`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-    });
-  } catch (e) {
-    yield { type: "error", error: String(e) };
-    return;
+  // Retry the initial fetch once on failure (2 attempts max)
+  let response: Response | undefined;
+  const maxFetchAttempts = 2;
+  for (let attempt = 0; attempt < maxFetchAttempts; attempt++) {
+    try {
+      const attemptResp = await fetch(`${provider.base_url}${LLM_DEFAULTS.endpoint}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+      });
+      // If OK or last attempt or non-retryable error, accept the response
+      if (attemptResp.ok || attempt === maxFetchAttempts - 1 || !LLM_RETRYABLE_STATUS.has(attemptResp.status)) {
+        response = attemptResp;
+        break;
+      }
+      // Retryable HTTP error — wait and retry
+      await sleep(1000);
+    } catch (e) {
+      if (attempt === maxFetchAttempts - 1) {
+        yield { type: "error", error: String(e) };
+        return;
+      }
+      // Network error — wait and retry
+      await sleep(1000);
+    }
   }
 
-  if (!response.ok) {
-    const text = await response.text();
-    yield { type: "error", error: `${response.status} ${text}` };
+  if (!response || !response.ok) {
+    const text = response ? await response.text() : "No response";
+    const status = response?.status ?? 0;
+    yield { type: "error", error: `${status} ${text}` };
     return;
   }
 
@@ -312,8 +303,7 @@ export async function* callLlmStream(
  */
 export async function callLlmStreamCollected(
   messages: LlmMessage[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tools: Array<{ type: string; function: { name: string; description: string; parameters: any } }>
+  tools: ToolDefinition[]
 ): Promise<LlmResponse> {
   let content = "";
   let tool_calls: ToolCall[] = [];
@@ -441,8 +431,7 @@ function backoffDelay(attempt: number, baseMs: number): number {
  */
 export async function callLlmWithRecovery(
   messages: LlmMessage[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tools: Array<{ type: string; function: { name: string; description: string; parameters: any } }>,
+  tools: ToolDefinition[],
   options?: {
     maxRetries?: number;
     onRetry?: (attempt: number, error: ErrorInfo) => void;
@@ -463,15 +452,12 @@ export async function callLlmWithRecovery(
     }
 
     try {
+      // callLlm now throws on failure, so a successful return means a valid response
       const resp = await callLlm(messages, tools);
 
-      // callLlm returns { content: null, tool_calls: [] } on failure
-      // We need to detect this — but it's also a valid "empty" response.
-      // We'll check if it looks like an error (null content + no tool_calls)
-      // and treat it as a retryable failure.
+      // callLlm returns { content: null, tool_calls: [] } only when the API
+      // returns a response with no message — treat as retryable.
       if (resp.content === null && resp.tool_calls.length === 0) {
-        // This could be a legitimate empty response or an error.
-        // Since callLlm already logged the error, treat as retryable.
         lastError = {
           category: "server_error",
           message: "LLM returned empty response",
@@ -483,6 +469,7 @@ export async function callLlmWithRecovery(
 
       return resp;
     } catch (e) {
+      // callLlm throws on HTTP errors and network failures
       lastError = classifyError(e);
       if (!lastError.retryable || attempt >= maxRetries) {
         break;
@@ -492,18 +479,69 @@ export async function callLlmWithRecovery(
 
   // All retries exhausted — try fallback model if available
   if (fallbackModel) {
+    onRetry?.(maxRetries + 1, {
+      category: lastError?.category ?? "unknown",
+      message: `All ${maxRetries} retries exhausted. Trying fallback model: ${fallbackModel}`,
+      retryable: false,
+    });
+
     try {
-      // Temporarily override the model by using callLlm directly
-      // with a modified provider that uses the fallback model.
-      // Since we can't easily swap models mid-flight, we'll just try
-      // one more time and let the caller handle the final failure.
-      onRetry?.(maxRetries + 1, {
-        category: lastError?.category ?? "unknown",
-        message: `All ${maxRetries} retries exhausted. ${lastError?.message ?? "Unknown error"}`,
-        retryable: false,
+      const provider = getActiveProvider();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.api_key}`,
+      };
+      const payload = {
+        model: fallbackModel,
+        messages,
+        tools,
+        tool_choice: LLM_DEFAULTS.toolChoice,
+        temperature: LLM_DEFAULTS.temperature,
+        max_tokens: LLM_DEFAULTS.maxTokens,
+      };
+
+      const resp = await fetch(`${provider.base_url}${LLM_DEFAULTS.endpoint}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
       });
-    } catch {
-      // Ignore — we're about to return the error
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error(
+          `⚠️  Fallback model (${fallbackModel}) failed: ${resp.status} ${text}`
+        );
+        return { content: null, tool_calls: [] };
+      }
+
+      const json = (await resp.json()) as {
+        choices: Array<{
+          message: {
+            content?: string | null;
+            tool_calls?: ToolCall[];
+          };
+        }>;
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+        };
+      };
+
+      usageTracker.record(json.usage, fallbackModel);
+
+      const msg = json.choices[0]?.message;
+      if (!msg) return { content: null, tool_calls: [] };
+
+      const content = (msg.content || "").trim();
+      const tool_calls = msg.tool_calls || [];
+      return { content, tool_calls };
+    } catch (e) {
+      console.error(
+        `⚠️  Fallback model (${fallbackModel}) failed: ${String(e)}`
+      );
+      return { content: null, tool_calls: [] };
     }
   }
 

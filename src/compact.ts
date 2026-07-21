@@ -100,9 +100,9 @@ export async function compactMessages(
   }
 
   const summaryMessage: LlmMessage = {
-    role: "user",
+    role: "system",
     content:
-      "[Compressed earlier conversation]\n" +
+      "[System: compressed context]\n" +
       resp.content +
       "\n[End compressed section — recent messages follow]",
   };

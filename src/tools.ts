@@ -8,6 +8,7 @@ import {
   DEFAULT_READ_FILE_LIMIT,
   MAX_LIST_FILES_RESULTS,
   MAX_GREP_RESULTS,
+  MAX_FILE_READ_SIZE,
   PREVIEW,
   SKIP_DIRS,
   MODE_PLAN,
@@ -81,14 +82,13 @@ export interface Tool {
   call(kwargs: Record<string, unknown>): string | Promise<string>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Handler = (...args: any[]) => string | Promise<string>;
+type Handler = (...args: unknown[]) => string | Promise<string>;
 
-export function createTool(
+export function createTool<P extends unknown[]>(
   name: string,
   description: string,
   parameters: ToolParameters,
-  handler: Handler
+  handler: (...args: P) => string | Promise<string>
 ): Tool {
   return {
     name,
@@ -103,7 +103,7 @@ export function createTool(
     call(kwargs: Record<string, unknown>): string | Promise<string> {
       const paramNames = Object.keys(parameters.properties);
       const args = paramNames.map((p) => kwargs[p]);
-      return handler(...args);
+      return handler(...(args as P));
     },
   };
 }
@@ -201,6 +201,11 @@ export function makeReadFileTool(): Tool {
     const start = Math.max(0, offset ?? 0);
     const maxLines = limit ?? DEFAULT_READ_FILE_LIMIT;
     try {
+      const stat = fs.statSync(filePath);
+      const sizeMB = (stat.size / (1024 * 1024)).toFixed(1);
+      if (stat.size > MAX_FILE_READ_SIZE) {
+        return `File too large (${sizeMB} MB). Max: 10 MB. Use offset/limit for large files.`;
+      }
       const content = fs.readFileSync(filePath, "utf-8");
       const lines = content.split("\n");
       const total = lines.length;
@@ -285,6 +290,11 @@ export function makeEditFileTool(): Tool {
   function handler(filePath: string, old: string, newStr: string): string {
     let content: string;
     try {
+      const stat = fs.statSync(filePath);
+      const sizeMB = (stat.size / (1024 * 1024)).toFixed(1);
+      if (stat.size > MAX_FILE_READ_SIZE) {
+        return `File too large (${sizeMB} MB). Max: 10 MB. Use offset/limit for large files.`;
+      }
       content = fs.readFileSync(filePath, "utf-8");
     } catch (e: unknown) {
       if ((e as NodeJS.ErrnoException).code === "ENOENT") {
@@ -302,6 +312,11 @@ export function makeEditFileTool(): Tool {
     }
 
     const updated = content.replace(old, newStr);
+    const newSize = Buffer.byteLength(updated, "utf-8");
+    if (newSize > MAX_FILE_READ_SIZE) {
+      const sizeMB = (newSize / (1024 * 1024)).toFixed(1);
+      return `Edit would produce file too large (${sizeMB} MB). Max: 10 MB.`;
+    }
     try {
       fs.writeFileSync(filePath, updated, "utf-8");
       return `OK: replaced 1 occurrence in ${filePath}`;
@@ -341,8 +356,18 @@ export function makeListFilesTool(): Tool {
     const pat = pattern || "*";
     try {
       const results: string[] = [];
+      const visited = new Set<string>();
 
       function walk(dir: string, rel: string): void {
+        let realDir: string;
+        try {
+          realDir = fs.realpathSync(dir);
+        } catch {
+          return;
+        }
+        if (visited.has(realDir)) return;
+        visited.add(realDir);
+
         let entries: fs.Dirent[];
         try {
           entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -409,6 +434,71 @@ export function makeListFilesTool(): Tool {
   );
 }
 
+/**
+ * Check if a regex pattern contains nested quantifiers (e.g., (a+)+, (a|b)*).
+ * These patterns can cause catastrophic backtracking (ReDoS).
+ */
+function hasNestedQuantifiers(pattern: string): boolean {
+  // Matches: group containing a quantifier (*+?), followed by a quantifier
+  // e.g., (a+)+, (a*)+, (a+)*, (a|b)+, (...){2,}
+  return /(\([^)]*[+*][^)]*\))[+*{]/.test(pattern);
+}
+
+/**
+ * Validate a regex by compiling it and testing on a small sample.
+ * Returns the compiled regex or an error message.
+ */
+function safeCompileRegex(pattern: string): RegExp | string {
+  if (hasNestedQuantifiers(pattern)) {
+    return "Regex rejected: pattern contains nested quantifiers (potential ReDoS). Simplify the pattern.";
+  }
+  try {
+    const regex = new RegExp(pattern);
+    // Quick smoke test on a small string to check for catastrophic backtracking
+    const testStart = Date.now();
+    regex.test("abcdefghijklmnopqrstuvwxyz0123456789");
+    if (Date.now() - testStart > 500) {
+      return "Regex rejected: pattern is too slow (exceeded 500ms on test input). Simplify the pattern.";
+    }
+    return regex;
+  } catch (e) {
+    return `Invalid regex: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
+/**
+ * Check if a hostname resolves to a private/internal IP.
+ * Blocks common SSRF targets: loopback, private ranges, link-local, cloud metadata.
+ */
+function isPrivateHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  // Block common patterns before DNS resolution
+  if (
+    h === "localhost" ||
+    h === "0.0.0.0" ||
+    h === "::1" ||
+    h === "[::1]" ||
+    h === "127.0.0.1" ||
+    h === "169.254.169.254" || // AWS/GCP/Azure metadata
+    h === "metadata.google.internal"
+  ) {
+    return true;
+  }
+  // Match private IPv4 ranges: 10.x, 172.16-31.x, 192.168.x
+  if (/^(10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}|192\.168\.\d{1,3})\.\d{1,3}$/.test(h)) {
+    return true;
+  }
+  // Match loopback 127.x
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) {
+    return true;
+  }
+  // Match IPv6 private range fc00::/7 and link-local fe80::
+  if (/^f[cd]/i.test(h) || /^fe80:/i.test(h)) {
+    return true;
+  }
+  return false;
+}
+
 export function makeGrepTool(): Tool {
   function handler(
     pattern: string,
@@ -417,10 +507,24 @@ export function makeGrepTool(): Tool {
   ): string {
     const base = searchPath || ".";
     const results: string[] = [];
-    const regex = new RegExp(pattern);
+    const compiled = safeCompileRegex(pattern);
+    if (typeof compiled === "string") {
+      return compiled;
+    }
+    const regex = compiled;
     const skipDirs = SKIP_DIRS;
+    const visited = new Set<string>();
 
     function walk(dir: string): void {
+      let realDir: string;
+      try {
+        realDir = fs.realpathSync(dir);
+      } catch {
+        return;
+      }
+      if (visited.has(realDir)) return;
+      visited.add(realDir);
+
       let entries: fs.Dirent[];
       try {
         entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -846,6 +950,17 @@ export function makeHttpRequestTool(): Tool {
     if (!url || !/^https?:\/\//i.test(url)) {
       return "Error: 'url' must be an http(s) URL.";
     }
+
+    // SSRF protection: block requests to private/internal networks
+    try {
+      const parsed = new URL(url);
+      if (isPrivateHost(parsed.hostname)) {
+        return "SSRF blocked: requests to internal/private networks are not allowed";
+      }
+    } catch {
+      return "Error: invalid URL format.";
+    }
+
     const httpMethod = (method || "GET").toUpperCase();
     const validMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"];
     if (!validMethods.includes(httpMethod)) {
@@ -1307,6 +1422,11 @@ export function makeHashTool(): Tool {
     let data: string;
     if (filePath) {
       try {
+        const stat = fs.statSync(filePath);
+        const sizeMB = (stat.size / (1024 * 1024)).toFixed(1);
+        if (stat.size > MAX_FILE_READ_SIZE) {
+          return `File too large (${sizeMB} MB). Max: 10 MB.`;
+        }
         data = fs.readFileSync(filePath, "utf-8");
       } catch (e: unknown) {
         if ((e as NodeJS.ErrnoException).code === "ENOENT") {

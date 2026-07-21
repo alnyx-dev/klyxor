@@ -85,10 +85,14 @@ export async function agentTurn(
       let streamedContent = "";
       let streamedToolCalls: import("./llm.js").ToolCall[] = [];
       let hasError = false;
+      const MAX_STREAM_CONTENT_CHARS = 500_000;
 
       for await (const chunk of callLlmStream(messages, toolSchemas)) {
         if (chunk.type === "content" && chunk.content) {
           streamedContent += chunk.content;
+          if (streamedContent.length > MAX_STREAM_CONTENT_CHARS) {
+            streamedContent = streamedContent.slice(0, MAX_STREAM_CONTENT_CHARS) + "\n... [stream truncated]";
+          }
           // Write directly to stdout for real-time display
           if (verbose) process.stdout.write(chunk.content);
         }
@@ -155,8 +159,9 @@ export async function agentTurn(
       let args: Record<string, unknown>;
       try {
         args = JSON.parse(tc.function.arguments);
-      } catch (e) {
-        resultStr = `Error: invalid JSON arguments for tool '${fname}': ${e}`;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        resultStr = `Error: invalid JSON arguments for tool '${fname}': ${msg}`;
         messages.push({
           role: "tool",
           content: resultStr,
@@ -174,9 +179,14 @@ export async function agentTurn(
           log({ type: "tool_call", tool: fname, args: argsPreview });
         }
         try {
+          const MAX_TOOL_RESULT_CHARS = 50_000;
           resultStr = String(await tool.call(args));
-        } catch (e) {
-          resultStr = `Error calling ${fname}: ${e}`;
+          if (resultStr.length > MAX_TOOL_RESULT_CHARS) {
+            resultStr = resultStr.slice(0, MAX_TOOL_RESULT_CHARS) + "\n... [truncated, full result too large]";
+          }
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          resultStr = `Error calling ${fname}: ${msg}`;
         }
       }
 

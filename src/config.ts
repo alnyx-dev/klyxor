@@ -110,11 +110,22 @@ export function resolveApiKey(raw: string | undefined): string {
   const placeholder = !raw || raw === "..." || raw.trim() === "";
   if (!placeholder) {
     const braceMatch = raw.match(/^\$\{([A-Z0-9_]+)\}$/i);
-    if (braceMatch) return process.env[braceMatch[1]] || "";
-    if (raw.startsWith("env:")) return process.env[raw.slice(4)] || "";
+    if (braceMatch) {
+      const val = process.env[braceMatch[1]];
+      if (!val) console.warn(`Warning: Environment variable ${braceMatch[1]} is not set`);
+      return val || "";
+    }
+    if (raw.startsWith("env:")) {
+      const varName = raw.slice(4);
+      const val = process.env[varName];
+      if (!val) console.warn(`Warning: Environment variable ${varName} is not set`);
+      return val || "";
+    }
     return raw;
   }
-  return process.env.KLYXOR_API_KEY || "";
+  const val = process.env.KLYXOR_API_KEY;
+  if (!val) console.warn("Warning: Environment variable KLYXOR_API_KEY is not set");
+  return val || "";
 }
 
 export function getActiveProvider(): Provider {
@@ -171,6 +182,7 @@ export function setActiveModel(providerName: string, model: string): string {
   }
   p.active_model = model;
   p.model = model; // keep deprecated field in sync
+  saveConfig();
   return `→ switched ${providerName} to model '${model}'`;
 }
 
@@ -229,6 +241,7 @@ export function connectCommand(arg: string): string {
       return `Unknown provider '${arg}'. Known: ${Object.keys(_providers).join(", ")}. Run /connect with no name to add a new one.`;
     }
     _activeProvider = arg;
+    saveConfig();
     return `→ switched to provider '${arg}'`;
   }
   // No arg: list providers (interactive add handled by TUI/REPL)
@@ -244,6 +257,7 @@ export function removeProvider(name: string): string {
     return "Cannot remove the only provider";
   }
   delete _providers[name];
+  saveConfig();
   if (_activeProvider === name) {
     const remaining = Object.keys(_providers);
     _activeProvider = remaining[0];
@@ -253,6 +267,7 @@ export function removeProvider(name: string): string {
 }
 
 export function saveConfig(): void {
+  const tmpFile = CONFIG_FILE + ".tmp";
   try {
     const data: ConfigData = {
       providers: _providers,
@@ -260,9 +275,12 @@ export function saveConfig(): void {
       mcpServers: _mcpServers.length > 0 ? _mcpServers : undefined,
       customToolsEnabled: _customToolsEnabled,
     };
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2), "utf-8");
-  } catch (e) {
-    console.error(`⚠️  Could not save config to ${CONFIG_FILE}: ${e}`);
+    fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
+    fs.renameSync(tmpFile, CONFIG_FILE);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`⚠️  Could not save config to ${CONFIG_FILE}: ${msg}`);
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup error */ }
   }
 }
 
@@ -300,9 +318,10 @@ export function loadConfig(): boolean {
       _customToolsEnabled = data.customToolsEnabled;
     }
     return true;
-  } catch (e) {
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error(
-      `⚠️  Could not load ${CONFIG_FILE} (${e}), using default provider config.`
+      `⚠️  Could not load ${CONFIG_FILE} (${msg}), using default provider config.`
     );
     return false;
   }

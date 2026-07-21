@@ -206,10 +206,14 @@ export class SessionManager {
 
 export function saveSessions(manager: SessionManager): void {
   const state = manager.toJSON();
+  const tmpFile = SESSIONS_FILE + ".tmp";
   try {
-    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(state, null, 2), "utf-8");
-  } catch (e) {
-    console.error(`⚠️  Could not save sessions to ${SESSIONS_FILE}: ${e}`);
+    fs.writeFileSync(tmpFile, JSON.stringify(state, null, 2), "utf-8");
+    fs.renameSync(tmpFile, SESSIONS_FILE);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`⚠️  Could not save sessions to ${SESSIONS_FILE}: ${msg}`);
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup error */ }
   }
 }
 
@@ -229,9 +233,10 @@ export function loadSessions(): SessionManager | null {
     }
 
     return SessionManager.fromJSON(state);
-  } catch (e) {
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error(
-      `⚠️  Could not load ${SESSIONS_FILE} (${e}), starting fresh.`
+      `⚠️  Could not load ${SESSIONS_FILE} (${msg}), starting fresh.`
     );
     return null;
   }

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import TextInput from "ink-text-input";
-import { SessionManager } from "../sessions.js";
+import { SessionManager, saveSessions } from "../sessions.js";
 import {
   getProviders,
   getActiveProviderName,
@@ -306,6 +306,7 @@ export function CommandPalette({
               manager.newSession(undefined, "build", true);
             }
           }
+          saveSessions(manager);
         }
         setSubMode("list");
         setDeleteTarget(null);

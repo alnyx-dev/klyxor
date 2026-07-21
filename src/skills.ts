@@ -44,7 +44,7 @@ function parseFrontmatter(raw: string): { metadata: SkillMetadata; body: string 
 
   const yamlBlock = match[1];
   const body = match[2].trim();
-  const metadata: SkillMetadata = {};
+  const parsed: Record<string, unknown> = {};
 
   let currentKey = "";
   let isArray = false;
@@ -56,7 +56,7 @@ function parseFrontmatter(raw: string): { metadata: SkillMetadata; body: string 
     // Array item (indented under a key)
     if (isArray && (line.startsWith("  - ") || line.startsWith("\t- "))) {
       const value = trimmed.replace(/^-\s*/, "").trim().replace(/^["']|["']$/g, "");
-      const arr = metadata[currentKey as keyof SkillMetadata] as string[] | undefined;
+      const arr = parsed[currentKey];
       if (Array.isArray(arr)) {
         arr.push(value);
       }
@@ -76,7 +76,7 @@ function parseFrontmatter(raw: string): { metadata: SkillMetadata; body: string 
     if (!value || value === "[]") {
       // Empty array or empty value
       if (value === "[]") {
-        (metadata as any)[key] = [];
+        parsed[key] = [];
         isArray = true;
       }
       continue;
@@ -90,16 +90,25 @@ function parseFrontmatter(raw: string): { metadata: SkillMetadata; body: string 
         .split(",")
         .map((s) => s.trim().replace(/^["']|["']$/g, ""))
         .filter(Boolean);
-      (metadata as any)[key] = items;
+      parsed[key] = items;
     } else if (value === "true") {
-      (metadata as any)[key] = true;
+      parsed[key] = true;
     } else if (value === "false") {
-      (metadata as any)[key] = false;
+      parsed[key] = false;
     } else {
-      (metadata as any)[key] = value.replace(/^["']|["']$/g, "");
+      parsed[key] = value.replace(/^["']|["']$/g, "");
       isArray = false;
     }
   }
+
+  const metadata: SkillMetadata = {
+    name: typeof parsed.name === "string" ? parsed.name : undefined,
+    description: typeof parsed.description === "string" ? parsed.description : undefined,
+    triggers: Array.isArray(parsed.triggers) ? parsed.triggers.map(String) : undefined,
+    tags: Array.isArray(parsed.tags) ? parsed.tags.map(String) : undefined,
+    version: typeof parsed.version === "string" ? parsed.version : undefined,
+    requires: Array.isArray(parsed.requires) ? parsed.requires.map(String) : undefined,
+  };
 
   return { metadata, body };
 }
@@ -117,7 +126,9 @@ export function discoverSkills(): Record<string, SkillInfo> {
   let entries: string[];
   try {
     entries = fs.readdirSync(SKILLS_DIR).sort();
-  } catch {
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`Warning: failed to read skills directory: ${msg}`);
     return skills;
   }
 
@@ -151,7 +162,9 @@ export function discoverSkills(): Record<string, SkillInfo> {
         metadata,
         content: body,
       };
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`Warning: failed to read skill ${fname}: ${msg}`);
       // skip unreadable files
     }
   }
@@ -270,6 +283,11 @@ export function createSkill(
     requires?: string[];
   } = {}
 ): string {
+  if (name.length > 64) return "Error: Skill name too long (max 64 chars)";
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    return "Error: Skill name must contain only letters, numbers, underscores, and hyphens";
+  }
+
   const skillPath = path.join(SKILLS_DIR, `${name}${SKILL_FILE_EXTENSION}`);
 
   if (fs.existsSync(skillPath)) {
