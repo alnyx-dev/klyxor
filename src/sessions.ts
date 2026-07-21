@@ -55,8 +55,17 @@ export class ChatSession {
     if (shouldCompact(this.messages)) {
       this.messages = await compactMessages(this.messages);
     }
-    const tools = buildToolsForAgent(this.mode, 0, log, this);
-    const answer = await agentTurn(this.messages, tools, log, undefined, false);
+
+    // Wrap log to only pass structured events to the UI callback.
+    // Plain strings (turn separators, status) go to console only.
+    const wrappedLog: LogFn = (msg) => {
+      if (typeof msg === "object" && msg !== null && "type" in msg) {
+        log(msg);
+      }
+    };
+
+    const tools = buildToolsForAgent(this.mode, 0, wrappedLog, this);
+    const answer = await agentTurn(this.messages, tools, wrappedLog, undefined, false);
     this.messages.push({ role: "assistant", content: answer });
     return answer;
   }

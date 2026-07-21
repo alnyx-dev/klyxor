@@ -22,10 +22,12 @@ import {
   INPUT_PLACEHOLDER,
   DEFAULT_MODE,
 } from "../constants.js";
+import type { ToolLogEvent } from "../tools.js";
 
 interface ChatEntry {
-  role: "user" | "agent" | "error" | "system" | "tool";
+  role: "user" | "agent" | "error" | "system" | "tool_call" | "tool_result";
   content: string;
+  toolName?: string;
 }
 
 interface AppProps {
@@ -226,11 +228,22 @@ export function App({ manager }: AppProps) {
 
       try {
         const answer = await manager.active.send(trimmed, (msg) => {
-          setChatLog((prev) => [...prev, { role: "tool", content: msg }]);
-          // Extract tool name from log messages like "🔧 bash(...)"
-          const toolMatch = msg.match(/🔧\s+(\w+)/);
-          if (toolMatch) {
-            setLoadingText(`Running ${toolMatch[1]}...`);
+          if (typeof msg === "object" && msg !== null && "type" in msg) {
+            const event = msg as ToolLogEvent;
+            if (event.type === "tool_call") {
+              setChatLog((prev) => [...prev, { 
+                role: "tool_call", 
+                content: event.args, 
+                toolName: event.tool 
+              }]);
+              setLoadingText(`Running ${event.tool}...`);
+            } else if (event.type === "tool_result") {
+              setChatLog((prev) => [...prev, { 
+                role: "tool_result", 
+                content: event.result, 
+                toolName: event.tool 
+              }]);
+            }
           }
         });
         setChatLog((prev) => [...prev, { role: "agent", content: answer }]);
@@ -313,11 +326,24 @@ export function App({ manager }: AppProps) {
                   </Box>
                 </Box>
               );
-            case "tool":
+            case "tool_call":
               return (
                 <Box key={i} marginTop={0} flexDirection="column">
                   <Text dimColor>
-                    {"  "}
+                    {"⚡ "}
+                    <Text bold>{entry.toolName}</Text>
+                    {" "}
+                    {entry.content.length > 60 
+                      ? entry.content.slice(0, 60) + "..." 
+                      : entry.content}
+                  </Text>
+                </Box>
+              );
+            case "tool_result":
+              return (
+                <Box key={i} marginTop={0} paddingLeft={2} flexDirection="column">
+                  <Text dimColor>
+                    {"→ "}
                     {entry.content.length > PREVIEW.toolOutput
                       ? entry.content.slice(0, PREVIEW.toolOutput) + "..."
                       : entry.content}

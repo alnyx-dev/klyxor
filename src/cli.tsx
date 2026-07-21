@@ -18,6 +18,7 @@ import { loadState, SessionManager, saveState } from "./sessions.js";
 import { runAgent } from "./agent.js";
 import { App } from "./tui/App.js";
 import { BANNER_WIDTH, DEFAULT_MODE } from "./constants.js";
+import { getUpdateNotification } from "./update-checker.js";
 
 const args = process.argv.slice(2);
 
@@ -68,6 +69,13 @@ if (args.length > 0) {
 
 ensureKlyxorDir();
 loadConfig();
+
+// Check for updates in background (non-blocking)
+getUpdateNotification().then((notification) => {
+  if (notification) {
+    console.log(`\n${notification}\n`);
+  }
+});
 
 const restored = loadState();
 const manager = restored || new SessionManager();

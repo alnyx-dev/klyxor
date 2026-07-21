@@ -8,6 +8,8 @@ import {
   saveConfig,
   getActiveModel,
   setActiveModel,
+  getMcpServer,
+  getMcpServers,
 } from "./config.js";
 import { discoverSkills, createSkill, getSkillInfo, findMatchingSkills } from "./skills.js";
 import { SessionManager, saveState } from "./sessions.js";
@@ -16,6 +18,8 @@ import { usageTracker } from "./usage.js";
 import { exportSessionMarkdown } from "./export.js";
 import { compactMessages } from "./compact.js";
 import { buildToolsForAgent } from "./agent.js";
+import { mcpManager } from "./mcp.js";
+import { checkForUpdate, formatUpdateNotification } from "./update-checker.js";
 
 export const HELP_TEXT = `\
 Commands:
@@ -36,6 +40,8 @@ Commands:
   /tools             list available tools in the current mode
   /export [path]     export current session transcript to a Markdown file
   /compact           manually compress conversation history (saves context)
+  /mcp               manage MCP server connections
+  /update            check for klyxor updates
   /help              show this message
   /exit, /quit       leave the chat
 Anything else is sent to the agent as a chat message in the current session.`;
@@ -247,6 +253,74 @@ export async function handleCommand(
       return { type: "handled", message: `Compacted: ${before} → ${after} messages` };
     } catch (e) {
       return { type: "handled", message: `Compact failed: ${e}` };
+    }
+  }
+
+  if (cmd === "/mcp") {
+    const subcommand = parts[1]?.toLowerCase();
+    const serverName = parts[2];
+
+    if (!subcommand || subcommand === "list") {
+      const connected = mcpManager.listConnected();
+      const configured = getMcpServers();
+      let output = connected;
+      if (configured.length > 0) {
+        output += `\n\nConfigured servers: ${configured.map((s) => s.name).join(", ")}`;
+      }
+      output += "\n\nUsage: /mcp list | /mcp connect <name> | /mcp disconnect <name>";
+      return { type: "handled", message: output };
+    }
+
+    if (subcommand === "connect") {
+      if (!serverName) {
+        return { type: "handled", message: "Usage: /mcp connect <server-name>" };
+      }
+      if (mcpManager.isConnected(serverName)) {
+        return { type: "handled", message: `MCP server '${serverName}' is already connected.` };
+      }
+      const config = getMcpServer(serverName);
+      if (!config) {
+        const configured = getMcpServers();
+        const names = configured.map((s) => s.name).join(", ") || "(none)";
+        return {
+          type: "handled",
+          message: `MCP server '${serverName}' not found in config. Configured: ${names}`,
+        };
+      }
+      const result = await mcpManager.connect(config);
+      return { type: "handled", message: result };
+    }
+
+    if (subcommand === "disconnect") {
+      if (!serverName) {
+        return { type: "handled", message: "Usage: /mcp disconnect <server-name>" };
+      }
+      const result = await mcpManager.disconnect(serverName);
+      return { type: "handled", message: result };
+    }
+
+    return {
+      type: "handled",
+      message: "Usage: /mcp list | /mcp connect <name> | /mcp disconnect <name>",
+    };
+  }
+
+  if (cmd === "/update") {
+    try {
+      const info = await checkForUpdate();
+      const notification = formatUpdateNotification(info);
+      if (notification) {
+        return { type: "handled", message: notification };
+      }
+      return {
+        type: "handled",
+        message: `✅ klyxor is up to date (v${info.currentVersion})`,
+      };
+    } catch (e) {
+      return {
+        type: "handled",
+        message: `Error checking for updates: ${e instanceof Error ? e.message : String(e)}`,
+      };
     }
   }
 

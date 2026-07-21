@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { MAX_SUBAGENT_DEPTH } from "./constants.js";
+import type { McpServerConfig } from "./mcp.js";
 
 export { MAX_SUBAGENT_DEPTH };
 
@@ -68,6 +69,8 @@ export interface Provider {
 export interface ConfigData {
   providers: Record<string, Provider>;
   active_provider: string;
+  mcpServers?: McpServerConfig[];
+  customToolsEnabled?: boolean;
 }
 
 let _providers: Record<string, Provider> = {
@@ -80,6 +83,8 @@ let _providers: Record<string, Provider> = {
   },
 };
 let _activeProvider = "default";
+let _mcpServers: McpServerConfig[] = [];
+let _customToolsEnabled = true;
 
 export function getProviders(): Record<string, Provider> {
   return _providers;
@@ -252,6 +257,8 @@ export function saveConfig(): void {
     const data: ConfigData = {
       providers: _providers,
       active_provider: _activeProvider,
+      mcpServers: _mcpServers.length > 0 ? _mcpServers : undefined,
+      customToolsEnabled: _customToolsEnabled,
     };
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (e) {
@@ -266,6 +273,8 @@ export function loadConfig(): boolean {
     const data = JSON.parse(raw) as {
       providers?: Record<string, Partial<Provider> & { model?: string }>;
       active_provider?: string;
+      mcpServers?: McpServerConfig[];
+      customToolsEnabled?: boolean;
     };
     const providers = data.providers;
     if (providers && Object.keys(providers).length > 0) {
@@ -284,6 +293,12 @@ export function loadConfig(): boolean {
     if (!(_activeProvider in _providers)) {
       _activeProvider = Object.keys(_providers)[0] || "default";
     }
+    if (data.mcpServers && Array.isArray(data.mcpServers)) {
+      _mcpServers = data.mcpServers;
+    }
+    if (typeof data.customToolsEnabled === "boolean") {
+      _customToolsEnabled = data.customToolsEnabled;
+    }
     return true;
   } catch (e) {
     console.error(
@@ -294,5 +309,41 @@ export function loadConfig(): boolean {
 }
 
 export function saveState(): void {
+  saveConfig();
+}
+
+// ── MCP Server Config ─────────────────────────────────────────
+
+export function getMcpServers(): McpServerConfig[] {
+  return _mcpServers;
+}
+
+export function addMcpServer(server: McpServerConfig): void {
+  _mcpServers.push(server);
+  saveConfig();
+}
+
+export function removeMcpServer(name: string): boolean {
+  const idx = _mcpServers.findIndex((s) => s.name === name);
+  if (idx === -1) return false;
+  _mcpServers.splice(idx, 1);
+  saveConfig();
+  return true;
+}
+
+export function getMcpServer(name: string): McpServerConfig | undefined {
+  return _mcpServers.find((s) => s.name === name);
+}
+
+// ── Custom Tools Config ──────────────────────────────────────
+
+/** Whether custom tool loading is enabled. */
+export function getCustomToolsEnabled(): boolean {
+  return _customToolsEnabled;
+}
+
+/** Enable or disable custom tool loading. Persists to config. */
+export function setCustomToolsEnabled(enabled: boolean): void {
+  _customToolsEnabled = enabled;
   saveConfig();
 }

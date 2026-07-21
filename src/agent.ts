@@ -1,9 +1,14 @@
-import { callLlm, type LlmMessage } from "./llm.js";
-import { buildTools, type Tool, type LogFn, type TaskProvider } from "./tools.js";
+import { callLlm, callLlmStream, callLlmWithRecovery, type LlmMessage } from "./llm.js";
+import { buildTools, type Tool, type LogFn, type TaskProvider, type ToolLogEvent } from "./tools.js";
 import { makeListSkillsTool, makeReadSkillTool, makeFindSkillsTool } from "./skills.js";
-import { DEFAULT_MAX_TURNS, SEPARATOR_WIDTH, PREVIEW, DEFAULT_MODE } from "./constants.js";
+import { DEFAULT_MAX_TURNS, SEPARATOR_WIDTH, PREVIEW, DEFAULT_MODE, DEFAULT_STREAM_ENABLED } from "./constants.js";
+import { mcpManager } from "./mcp.js";
 
 export type { LogFn } from "./tools.js";
+
+/** Re-export SubagentPool for consumers that need direct access. */
+export { SubagentPool, type PoolTask, type PoolResult, type PoolTaskResult } from "./subagent-pool.js";
+export { MAX_PARALLEL_AGENTS } from "./constants.js";
 
 export const PLAN_SYSTEM_PROMPT = `\
 You are Klyxor, a coding agent operating in PLAN mode.
@@ -42,7 +47,7 @@ export function buildToolsForAgent(
   log: LogFn,
   taskProvider?: TaskProvider
 ): Map<string, Tool> {
-  const tools = buildTools(mode, depth, log, runAgent, taskProvider);
+  const tools = buildTools(mode, depth, log, runAgent, taskProvider, mcpManager);
   tools.set("list_skills", makeListSkillsTool());
   tools.set("read_skill", makeReadSkillTool());
   tools.set("find_skills", makeFindSkillsTool());
@@ -59,9 +64,11 @@ export async function agentTurn(
   tools: Map<string, Tool>,
   log: LogFn = console.log,
   maxTurns?: number,
-  verbose: boolean = true
+  verbose: boolean = true,
+  options?: { stream?: boolean }
 ): Promise<string> {
   const limit = maxTurns ?? DEFAULT_MAX_TURNS;
+  const useStream = options?.stream ?? DEFAULT_STREAM_ENABLED;
 
   for (let turn = 1; turn <= limit; turn++) {
     if (verbose) {
@@ -70,10 +77,52 @@ export async function agentTurn(
 
     const toolSchemas = Array.from(tools.values()).map((t) => t.schema());
 
-    const { content, tool_calls: toolCalls } = await callLlm(
-      messages,
-      toolSchemas
-    );
+    let content: string | null;
+    let toolCalls: import("./llm.js").ToolCall[];
+
+    if (useStream) {
+      // Streaming mode: yield chunks as they arrive
+      let streamedContent = "";
+      let streamedToolCalls: import("./llm.js").ToolCall[] = [];
+      let hasError = false;
+
+      for await (const chunk of callLlmStream(messages, toolSchemas)) {
+        if (chunk.type === "content" && chunk.content) {
+          streamedContent += chunk.content;
+          // Write directly to stdout for real-time display
+          if (verbose) process.stdout.write(chunk.content);
+        }
+        if (chunk.type === "tool_calls" && chunk.tool_calls) {
+          streamedToolCalls = chunk.tool_calls;
+        }
+        if (chunk.type === "error") {
+          hasError = true;
+          log(`❌ Streaming error: ${chunk.error}`);
+        }
+      }
+
+      if (hasError) {
+        // Fall back to non-streaming with error recovery
+        const result = await callLlmWithRecovery(messages, toolSchemas, {
+          onRetry: (attempt, err) => log(`⚠️ Retry ${attempt}: ${err.message}`),
+        });
+        content = result.content;
+        toolCalls = result.tool_calls;
+      } else {
+        content = streamedContent.trim() || null;
+        toolCalls = streamedToolCalls;
+      }
+
+      // Add newline after streamed content
+      if (verbose && streamedContent) process.stdout.write("\n");
+    } else {
+      // Non-streaming mode: use error recovery
+      const result = await callLlmWithRecovery(messages, toolSchemas, {
+        onRetry: (attempt, err) => log(`⚠️ Retry ${attempt}: ${err.message}`),
+      });
+      content = result.content;
+      toolCalls = result.tool_calls;
+    }
 
     if (content === null && toolCalls.length === 0) {
       log("❌ LLM call failed.");
@@ -81,7 +130,9 @@ export async function agentTurn(
     }
 
     if (verbose && content) {
-      log(`🤖 ${content}`);
+      if (!useStream) {
+        log(`🤖 ${content}`);
+      }
     }
 
     if (toolCalls.length === 0) {
@@ -120,7 +171,7 @@ export async function agentTurn(
       } else {
         if (verbose) {
           const argsPreview = JSON.stringify(args).slice(0, PREVIEW.args);
-          log(`🔧 ${fname}(${argsPreview})`);
+          log({ type: "tool_call", tool: fname, args: argsPreview });
         }
         try {
           resultStr = String(await tool.call(args));
@@ -134,7 +185,7 @@ export async function agentTurn(
           resultStr.length > PREVIEW.result
             ? resultStr.slice(0, PREVIEW.result) + "..."
             : resultStr;
-        log(`   → ${preview}`);
+        log({ type: "tool_result", tool: fname, result: preview });
       }
       messages.push({
         role: "tool",
@@ -161,8 +212,12 @@ export async function runAgent(
 ): Promise<string> {
   const indent = "  ".repeat(depth);
 
-  const _log: LogFn = (msg: string): void => {
-    log(`${indent}${msg}`);
+  const _log: LogFn = (msg) => {
+    if (typeof msg === "string") {
+      log(`${indent}${msg}`);
+    } else {
+      log(msg);
+    }
   };
 
   const tools = buildToolsForAgent(mode, depth, _log);

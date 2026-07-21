@@ -704,6 +704,15 @@
         <a href="#skills" class="sidebar-link">Skills System</a>
     </div>
     <div class="sidebar-group">
+        <div class="sidebar-label">Intelligence</div>
+        <a href="#mcp" class="sidebar-link">MCP Integration</a>
+        <a href="#streaming" class="sidebar-link">Streaming</a>
+        <a href="#refactoring" class="sidebar-link">Refactoring Engine</a>
+        <a href="#multi-agent" class="sidebar-link">Multi-Agent</a>
+        <a href="#time-machine" class="sidebar-link">Time Machine</a>
+        <a href="#predictive-bugs" class="sidebar-link">Predictive Bugs</a>
+    </div>
+    <div class="sidebar-group">
         <div class="sidebar-label">Advanced</div>
         <a href="#sessions" class="sidebar-link">Session Management</a>
         <a href="#compaction" class="sidebar-link">Context Compaction</a>
@@ -754,8 +763,32 @@
                 <div class="feature-item-desc">Markdown skills with triggers, dependencies, and auto-matching.</div>
             </div>
             <div class="feature-item">
-                <div class="feature-item-name">Todo Lists</div>
-                <div class="feature-item-desc">Agent tracks tasks inside sessions. All changes visible in chat.</div>
+                <div class="feature-item-name">Streaming</div>
+                <div class="feature-item-desc">Real-time token-by-token output. See responses as they arrive.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Error Recovery</div>
+                <div class="feature-item-desc">Auto-retry with exponential backoff. Fallback model on failure.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">MCP Integration</div>
+                <div class="feature-item-desc">Connect to any MCP server for external tools and data.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Refactoring Engine</div>
+                <div class="feature-item-desc">Analyze code, generate plans, execute with validation.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Multi-Agent Orchestrator</div>
+                <div class="feature-item-desc">7 specialized agents (frontend, backend, db, devops, security, testing, docs).</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Time Machine</div>
+                <div class="feature-item-desc">Snapshot codebase state, rewind, compare, branch.</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-item-name">Predictive Bug Detection</div>
+                <div class="feature-item-desc">25+ built-in patterns. Scan files for potential bugs.</div>
             </div>
             <div class="feature-item">
                 <div class="feature-item-name">Token & Cost Tracking</div>
@@ -1045,6 +1078,10 @@
                     <tr><td><code>/cost</code></td><td>Show total usage and estimated cost</td></tr>
                     <tr><td><code>/tokens</code></td><td>Detailed per-model token breakdown</td></tr>
                     <tr><td><code>/tools</code></td><td>List all tools available in current mode</td></tr>
+                    <tr><td><code>/mcp list</code></td><td>List connected MCP servers and their tools</td></tr>
+                    <tr><td><code>/mcp connect &lt;name&gt;</code></td><td>Connect to a configured MCP server</td></tr>
+                    <tr><td><code>/mcp disconnect &lt;name&gt;</code></td><td>Disconnect from an MCP server</td></tr>
+                    <tr><td><code>/update</code></td><td>Check for Klyxor updates</td></tr>
                     <tr><td><code>/exit</code></td><td>Save and exit Klyxor</td></tr>
                 </tbody>
             </table>
@@ -1255,6 +1292,289 @@
                 <dd><code>string</code> - <code>"pending"</code>, <code>"in_progress"</code>, or <code>"completed"</code> (for update)</dd>
             </dl>
         </div>
+
+        <h3>Extended Tools</h3>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">http_request</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Make HTTP requests to any URL. Supports GET, POST, PUT, DELETE, PATCH, HEAD.</p>
+            <dl class="tool-params">
+                <dt>url</dt>
+                <dd><code>string</code> - URL to request</dd>
+                <dt>method</dt>
+                <dd><code>string</code> - HTTP method (default: GET)</dd>
+                <dt>headers</dt>
+                <dd><code>object</code> - Request headers (optional)</dd>
+                <dt>body</dt>
+                <dd><code>string</code> - Request body (optional)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">json_query</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Read JSON files with dot-notation path navigation.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - JSON file path</dd>
+                <dt>query</dt>
+                <dd><code>string</code> - Dot-notation path (e.g. <code>users[0].name</code>)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">env_read</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Read environment variables. Returns specific var or lists common vars.</p>
+            <dl class="tool-params">
+                <dt>name</dt>
+                <dd><code>string</code> - Variable name (optional, lists all if omitted)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">file_info</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Get file metadata: size, timestamps, permissions, type flags.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - File path</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">copy_file</span>
+                <span class="tool-badge mode-plan">Build only</span>
+            </div>
+            <p class="tool-desc">Copy files. Blocked in Plan mode.</p>
+            <dl class="tool-params">
+                <dt>source</dt>
+                <dd><code>string</code> - Source file path</dd>
+                <dt>destination</dt>
+                <dd><code>string</code> - Destination path</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">move_file</span>
+                <span class="tool-badge mode-plan">Build only</span>
+            </div>
+            <p class="tool-desc">Move or rename files. Destructive operation.</p>
+            <dl class="tool-params">
+                <dt>source</dt>
+                <dd><code>string</code> - Source file path</dd>
+                <dt>destination</dt>
+                <dd><code>string</code> - Destination path</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">diff_apply</span>
+                <span class="tool-badge mode-plan">Build only</span>
+            </div>
+            <p class="tool-desc">Apply unified diff patches to files.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - File to patch</dd>
+                <dt>diff</dt>
+                <dd><code>string</code> - Unified diff content</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">tree</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Display directory tree visualization with SKIP_DIRS filtering.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - Directory path (optional)</dd>
+                <dt>depth</dt>
+                <dd><code>number</code> - Max depth (default: 3)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">hash</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Hash files or strings with md5, sha1, or sha256.</p>
+            <dl class="tool-params">
+                <dt>path</dt>
+                <dd><code>string</code> - File path (optional)</dd>
+                <dt>text</dt>
+                <dd><code>string</code> - Text to hash (optional)</dd>
+                <dt>algorithm</dt>
+                <dd><code>string</code> - md5, sha1, or sha256 (default: sha256)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">base64</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Base64 encode or decode strings.</p>
+            <dl class="tool-params">
+                <dt>action</dt>
+                <dd><code>string</code> - <code>"encode"</code> or <code>"decode"</code></dd>
+                <dt>text</dt>
+                <dd><code>string</code> - Input text</dd>
+            </dl>
+        </div>
+
+        <h3>Intelligence Tools</h3>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">spawn_parallel</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Execute multiple tasks in parallel with separate subagents.</p>
+            <dl class="tool-params">
+                <dt>tasks</dt>
+                <dd><code>array</code> - Array of {task, mode?} objects</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">git_worktree</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Manage git worktrees for parallel branch work.</p>
+            <dl class="tool-params">
+                <dt>action</dt>
+                <dd><code>string</code> - add, remove, list, switch, prune</dd>
+                <dt>name</dt>
+                <dd><code>string</code> - Worktree name</dd>
+                <dt>branch</dt>
+                <dd><code>string</code> - Branch name (for add)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">pipeline</span>
+                <span class="tool-badge mode-plan">Build only</span>
+            </div>
+            <p class="tool-desc">Execute multi-step command pipelines with variable interpolation.</p>
+            <dl class="tool-params">
+                <dt>name</dt>
+                <dd><code>string</code> - Pipeline name (optional)</dd>
+                <dt>steps</dt>
+                <dd><code>string</code> - JSON array of step objects</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">refactor</span>
+                <span class="tool-badge mode-plan">Build only</span>
+            </div>
+            <p class="tool-desc">Analyze code, generate refactoring plans, execute with validation.</p>
+            <dl class="tool-params">
+                <dt>action</dt>
+                <dd><code>string</code> - analyze, plan, execute</dd>
+                <dt>path</dt>
+                <dd><code>string</code> - File or directory to analyze</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">multi_agent</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Access 7 specialized agents: frontend, backend, database, devops, security, testing, documentation.</p>
+            <dl class="tool-params">
+                <dt>action</dt>
+                <dd><code>string</code> - list, suggest, describe</dd>
+                <dt>agent</dt>
+                <dd><code>string</code> - Agent role name</dd>
+                <dt>task</dt>
+                <dd><code>string</code> - Task description (for suggest)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">time_machine</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Snapshot codebase state, rewind, compare, and branch.</p>
+            <dl class="tool-params">
+                <dt>action</dt>
+                <dd><code>string</code> - snapshot, restore, list, diff, branch, branches, delete</dd>
+                <dt>name</dt>
+                <dd><code>string</code> - Snapshot or branch name</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">predict_bugs</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Scan code for 25+ built-in bug patterns across 7 categories.</p>
+            <dl class="tool-params">
+                <dt>action</dt>
+                <dd><code>string</code> - scan, scan-dir, patterns</dd>
+                <dt>path</dt>
+                <dd><code>string</code> - File or directory to scan</dd>
+                <dt>category</dt>
+                <dd><code>string</code> - Filter by category (optional)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">list_skills</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">List all available skills in ~/.klyxor/skills/.</p>
+            <dl class="tool-params">
+                <dt>No parameters</dt>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">read_skill</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Read a skill file to load its instructions.</p>
+            <dl class="tool-params">
+                <dt>name</dt>
+                <dd><code>string</code> - Skill name (without .md)</dd>
+            </dl>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-name">find_skills</span>
+                <span class="tool-badge">Both modes</span>
+            </div>
+            <p class="tool-desc">Find skills matching a file path or task description.</p>
+            <dl class="tool-params">
+                <dt>query</dt>
+                <dd><code>string</code> - File path or task description</dd>
+            </dl>
+        </div>
     </section>
 
     <div class="section-divider"></div>
@@ -1345,6 +1665,203 @@ When refactoring TypeScript code, follow these guidelines...
             <li><code>/skills info &lt;name&gt;</code> - Show full details for a skill</li>
             <li><code>/skills find &lt;query&gt;</code> - Search skills by keyword or file type</li>
         </ul>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== MCP INTEGRATION ======================== -->
+    <section class="doc-section" id="mcp">
+        <h2>MCP Integration</h2>
+        <p>Klyxor supports the Model Context Protocol (MCP) for connecting to external tool servers. MCP lets you extend the agent with tools from any compatible server.</p>
+
+        <h3>Configuration</h3>
+        <p>Add MCP servers to your config:</p>
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">json</span>
+            </div>
+            <pre>{
+  "mcpServers": {
+    "my-server": {
+      "name": "my-server",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@my-org/mcp-server"]
+    }
+  }
+}</pre>
+        </div>
+
+        <h3>Commands</h3>
+        <ul>
+            <li><code>/mcp list</code> - Show connected servers and their tools</li>
+            <li><code>/mcp connect &lt;name&gt;</code> - Connect to a configured server</li>
+            <li><code>/mcp disconnect &lt;name&gt;</code> - Disconnect from a server</li>
+        </ul>
+
+        <h3>Transport Types</h3>
+        <ul>
+            <li><strong>stdio</strong> - Spawns a subprocess and communicates via stdin/stdout</li>
+            <li><strong>http</strong> - Connects to an HTTP endpoint (StreamableHTTP)</li>
+        </ul>
+
+        <div class="callout">
+            <div class="callout-title">Note</div>
+            <p>MCP tools are prefixed with <code>mcp_&lt;server&gt;_&lt;tool&gt;</code> to avoid naming conflicts. A server providing a <code>search</code> tool becomes <code>mcp_my-server_search</code>.</p>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== STREAMING ======================== -->
+    <section class="doc-section" id="streaming">
+        <h2>Streaming</h2>
+        <p>Klyxor supports real-time streaming of LLM responses. Tokens are displayed as they arrive, giving you immediate feedback.</p>
+
+        <h3>How It Works</h3>
+        <p>When streaming is enabled (default), the agent uses Server-Sent Events (SSE) to receive tokens from the LLM provider. Each token is written to stdout immediately.</p>
+
+        <h3>Error Recovery</h3>
+        <p>If a stream fails, Klyxor automatically:</p>
+        <ol>
+            <li>Classifies the error (rate limit, timeout, server error, etc.)</li>
+            <li>Retries with exponential backoff (up to 3 attempts)</li>
+            <li>Falls back to a backup model if retries fail</li>
+        </ol>
+
+        <h3>Configuration</h3>
+        <div class="code-block">
+            <div class="code-block-header">
+                <span class="code-block-lang">json</span>
+            </div>
+            <pre>{
+  "stream": true,
+  "errorRecovery": {
+    "maxRetries": 3,
+    "fallbackModel": "gpt-4o-mini"
+  }
+}</pre>
+        </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== REFACTORING ENGINE ======================== -->
+    <section class="doc-section" id="refactoring">
+        <h2>Refactoring Engine</h2>
+        <p>Analyze code quality, generate refactoring plans, and execute changes with validation.</p>
+
+        <h3>Actions</h3>
+        <ul>
+            <li><code>analyze</code> - Scan a file for code quality issues (complexity, duplication, length)</li>
+            <li><code>plan</code> - Generate a refactoring plan with specific actions</li>
+            <li><code>execute</code> - Apply the plan and validate changes</li>
+        </ul>
+
+        <h3>Metrics Detected</h3>
+        <ul>
+            <li>Lines of code and function count</li>
+            <li>Average function length</li>
+            <li>Maximum nesting depth</li>
+            <li>Duplicate line detection</li>
+            <li>TODO/FIXME comments</li>
+        </ul>
+
+        <h3>Refactoring Actions</h3>
+        <ul>
+            <li>Extract long functions into smaller ones</li>
+            <li>Remove duplicate code</li>
+            <li>Simplify deeply nested conditionals</li>
+            <li>Add missing error handling</li>
+        </ul>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== MULTI-AGENT ======================== -->
+    <section class="doc-section" id="multi-agent">
+        <h2>Multi-Agent Orchestrator</h2>
+        <p>Access 7 specialized agents optimized for different domains.</p>
+
+        <h3>Available Agents</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Agent</th><th>Domain</th><th>Expertise</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>frontend</code></td><td>UI/UX</td><td>React, CSS, accessibility, responsive design</td></tr>
+                    <tr><td><code>backend</code></td><td>Server</td><td>APIs, databases, authentication, performance</td></tr>
+                    <tr><td><code>database</code></td><td>Data</td><td>Schema design, queries, migrations, optimization</td></tr>
+                    <tr><td><code>devops</code></td><td>Infrastructure</td><td>Docker, CI/CD, deployment, monitoring</td></tr>
+                    <tr><td><code>security</code></td><td>Security</td><td>Vulnerabilities, OWASP, authentication, encryption</td></tr>
+                    <tr><td><code>testing</code></td><td>Quality</td><td>Unit, integration, e2e testing strategies</td></tr>
+                    <tr><td><code>documentation</code></td><td>Docs</td><td>API docs, README, inline comments</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Actions</h3>
+        <ul>
+            <li><code>list</code> - Show all available agents</li>
+            <li><code>suggest</code> - Get agent recommendations for a task</li>
+            <li><code>describe</code> - Show detailed agent capabilities</li>
+        </ul>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== TIME MACHINE ======================== -->
+    <section class="doc-section" id="time-machine">
+        <h2>Time Machine</h2>
+        <p>Snapshot your codebase state, rewind to previous points, compare changes, and create branches.</p>
+
+        <h3>Actions</h3>
+        <ul>
+            <li><code>snapshot</code> - Create a named snapshot of current state</li>
+            <li><code>restore</code> - Rewind to a previous snapshot</li>
+            <li><code>list</code> - Show all snapshots</li>
+            <li><code>diff</code> - Compare two snapshots</li>
+            <li><code>branch</code> - Create a named branch from a snapshot</li>
+            <li><code>branches</code> - List all branches</li>
+            <li><code>delete</code> - Remove a snapshot</li>
+        </ul>
+
+        <h3>Storage</h3>
+        <p>Snapshots are stored in <code>.klyxor/snapshots/</code>. Each snapshot contains file contents and metadata. Maximum 100 snapshots, 50 files per snapshot.</p>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <!-- ======================== PREDICTIVE BUGS ======================== -->
+    <section class="doc-section" id="predictive-bugs">
+        <h2>Predictive Bug Detection</h2>
+        <p>Scan code for 25+ built-in bug patterns across 7 categories.</p>
+
+        <h3>Actions</h3>
+        <ul>
+            <li><code>scan</code> - Scan a single file</li>
+            <li><code>scan-dir</code> - Scan a directory recursively</li>
+            <li><code>patterns</code> - List all built-in patterns</li>
+        </ul>
+
+        <h3>Categories</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Category</th><th>Examples</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>null-safety</code></td><td>Unchecked null/undefined access, optional chaining misses</td></tr>
+                    <tr><td><code>async</code></td><td>Missing await, unhandled promises, race conditions</td></tr>
+                    <tr><td><code>resource</code></td><td>Unclosed resources, missing cleanup, memory leaks</td></tr>
+                    <tr><td><code>logic</code></td><td>Off-by-one errors, unreachable code, empty blocks</td></tr>
+                    <tr><td><code>type</code></td><td>Implicit any, type coercion issues</td></tr>
+                    <tr><td><code>security</code></td><td>SQL injection, eval usage, hardcoded secrets</td></tr>
+                    <tr><td><code>quality</code></td><td>Complex functions, deep nesting, too many parameters</td></tr>
+                </tbody>
+            </table>
+        </div>
     </section>
 
     <div class="section-divider"></div>
